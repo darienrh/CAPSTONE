@@ -10,17 +10,8 @@ Research:
 Capstone Plan / Major Steps
 https://docs.google.com/document/d/1TyNDhhldyZrOfPqjnGow5GCAIkeK4jLHP_3Sfbgk-kA/edit?usp=sharing
 
-https://claude.ai/share/4e6c5967-df3f-45e4-ad58-682a0085581a
-
 AI Research
 https://docs.google.com/document/d/1f7H4HA1FChojEzTnEbQQ3oYjpCEG2L5mY3jQq9a5j-I/edit?usp=sharing
-
-
-
-
-CapstoneFAQ
-https://docs.google.com/document/d/1teFXR3FSfuzJUVQIzTTSZUTnikc-7pqCPN2zpEFUSrk/edit?tab=t.0#heading=h.oqy49hfgrjv0
-
 
 
 Project Proposal 
