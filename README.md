@@ -10,7 +10,7 @@ Research:
 Capstone Plan / Major Steps
 https://docs.google.com/document/d/1TyNDhhldyZrOfPqjnGow5GCAIkeK4jLHP_3Sfbgk-kA/edit?usp=sharing
 
-AI Research
+Decision Tree psuedo code
 https://docs.google.com/document/d/1f7H4HA1FChojEzTnEbQQ3oYjpCEG2L5mY3jQq9a5j-I/edit?usp=sharing
 
 
