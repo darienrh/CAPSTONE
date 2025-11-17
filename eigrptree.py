@@ -22,8 +22,8 @@ def parse_ospf_debug(debug_output):
     for line in lines:
         if "K-value mismatch" in line:
             mismatches.append("k-value mismatch")
-        if "Dead interval mismatch" in line:
-            mismatches.append("dead interval mismatch")
+        if "not on common subnet" in line:
+            mismatches.append("wrong subnet")
     return mismatches
 
 def getEIGRPconfigs(conn):
@@ -60,7 +60,6 @@ def troubleshoot_and_fix_ospf(device_ip, username, password, enable_pass, neighb
     commands_to_fix = []
 
     interface = "GigabitEthernet0/1"
-    area = "0"
 
     if "k-value mismatch" in mismatches:
         commands_to_fix += [
@@ -68,10 +67,10 @@ def troubleshoot_and_fix_ospf(device_ip, username, password, enable_pass, neighb
             "metric weights 1 0 1 0 0"
         ]
 
-    if "dead interval mismatch" in mismatches:
+    if "wrong subnet" in mismatches:
         commands_to_fix += [
             f"interface {interface}",
-            "ip ospf dead-interval 40"
+            "ip address {ip address}"
         ]
 
     if commands_to_fix:

@@ -1,4 +1,4 @@
-def ospfdecisiontree(ospf_status):
+def OSPFdecisiontree(ospf_status):
     if not ospf_status['ping_neighbor']:
         return "Layer 1/2 connectivity issue. Check cables, interfaces, and IP connectivity."
     if not ospf_status['protocol_89']:
@@ -8,8 +8,6 @@ def ospfdecisiontree(ospf_status):
             return "No Hello packets. Check OSPF configuration, network types, and timers."
         if ospf_status['area_id_mismatch']:
             return "Area ID mismatch. Correct area configuration on both sides."
-        if ospf_status['auth_mismatch']:
-            return "Authentication mismatch. Check OSPF authentication type and password."
         if ospf_status['subnet_mismatch']:
             return "Subnet mask mismatch. Ensure matched subnet masks."
         if ospf_status['timer_mismatch']:
@@ -28,10 +26,15 @@ ospf_status = {
     'neighbor_state': "DOWN",
     'hello_packets': True,
     'area_id_mismatch': False,
-    'auth_mismatch': False,
     'subnet_mismatch': True,
     'timer_mismatch': False,
     'routes_missing': False
 }
-result = troubleshoot_ospf(ospf_status)
-print(result)
+
+def main_troubleshoot(status_info, protocol):
+    if protocol == 'OSPF':
+        return OSPFdecisiontree(status_info)
+    elif protocol == 'BGP':
+        return BGPdecisiontree(status_info)
+    else:
+        return "Unsupported protocol for troubleshooting."
