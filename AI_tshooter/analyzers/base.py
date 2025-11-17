@@ -5,7 +5,6 @@ Covers: Interfaces, IP Addressing, Hello/Dead Intervals, NTP, Default Gateway
 from typing import List, Dict, Any
 from models.diagnostic import DiagnosticResult, Severity
 
-
 class BaseNetworkAnalyzer:
     """Analyzes base Layer 3 networking components"""
     

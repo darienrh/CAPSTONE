@@ -2,7 +2,6 @@
 Configuration deployment module
 Connects to network devices and applies configuration changes
 """
-
 import time
 from typing import List, Dict, Any, Optional
 from netmiko import ConnectHandler
