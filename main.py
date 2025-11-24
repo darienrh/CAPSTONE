@@ -1,3 +1,6 @@
+import ospftree as ospf_issues
+import inferfacetree as intefacetree_issues
+
 def OSPFdecisiontree(ospf_status):
     if not ospf_status['ping_neighbor']:
         return "Layer 1/2 connectivity issue. Check cables, interfaces, and IP connectivity."
@@ -19,6 +22,11 @@ def OSPFdecisiontree(ospf_status):
         return "Route not in OSPF table. Check network statements and passive interfaces."
     return "OSPF appears operational."
 
+def Intefacedecisiontree(status):
+    if status['down interface']:
+        intefacetree_issues.troubleshoot_interface(status)
+        return "Attempted to no shutdown interface."
+
 # Example usage:
 ospf_status = {
     'ping_neighbor': True,
@@ -36,5 +44,7 @@ def main_troubleshoot(status_info, protocol):
         return OSPFdecisiontree(status_info)
     elif protocol == 'BGP':
         return BGPdecisiontree(status_info)
+    elif protocol == 'OSPF':
+        return Intefacedecisiontree(status_info)
     else:
         return "Unsupported protocol for troubleshooting."

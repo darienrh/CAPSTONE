@@ -1,8 +1,6 @@
 import time
-
 from netmiko import ConnectHandler
 from netmiko.cli_tools.outputters import output_raw
-
 
 def enableospfhellodebug(conn):
     conn.send_command('debug ospf hello')
@@ -24,6 +22,8 @@ def parse_ospf_debug(debug_output):
             mismatches.append("hello interval mismatch")
         if "Dead interval mismatch" in line:
             mismatches.append("dead interval mismatch")
+        if "OSPF detected duplicate router-id" in line:
+            mismatches.append("duplicate router id")
     return mismatches
 
 def getospfconfigs(conn):
@@ -63,15 +63,28 @@ def troubleshoot_and_fix_ospf(device_ip, username, password, enable_pass, neighb
     area = "0"
 
     if "hello interval mismatch" in mismatches:
+        print("There is an error with hello interval mismatch!\n, Changing {interface} hello-timer to 10", interface),
         commands_to_fix += [
+            f"config t"
             f"interface {interface}",
             "ip ospf hello-interval 10"
         ]
 
     if "dead interval mismatch" in mismatches:
+        print("There is an error with dead interval mismatch!\n, Changing {interface} dead-timer to 10", interface),
         commands_to_fix += [
+            f"config t"
             f"interface {interface}",
             "ip ospf dead-interval 40"
+        ]
+
+    if "OSPF detected duplicate router-id" in mismatches:
+        print("There is an error with OSPF detected duplicate router-id!"),
+        commands_to_fix += [
+            f"config t"
+            f"router ospf 1"
+            f"no router-id"
+            f"router-id {device_ip}",
         ]
 
     if commands_to_fix:
