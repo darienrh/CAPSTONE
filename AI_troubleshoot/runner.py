@@ -395,7 +395,7 @@ def main():
     print("  1. Interface diagnostics")
     print("  2. EIGRP diagnostics")
     print("  3. OSPF diagnostics")
-    print("  4. all (default)")
+    print("  4. All (default)")
 
     diag_choice = input("\nChoice (1/2/3/4): ").strip()
 
@@ -423,7 +423,7 @@ def main():
 
     try:
         # Phase 1: Detect all issues (opens connections)
-        detected_issues = runner.run_diagnostics(device_names, check_interfaces, check_eigrp)
+        detected_issues = runner.run_diagnostics(device_names, check_interfaces, check_eigrp, check_ospf)
 
         # Show detection summary
         print("\n" + "=" * 60)
@@ -454,6 +454,18 @@ def main():
                 else:
                     print(f"  {device}: No issues")
 
+        
+        if check_ospf:
+            print("\nOSPF Issues:")
+            for device, problems in detected_issues['ospf'].items():
+                if problems:
+                    print(f"  {device}: {len(problems)} issue(s)")
+                    for p in problems:
+                        print(f"    - {p['type']}")
+                    total_issues += len(problems)
+                else:
+                    print(f"  {device}: No issues")
+
         print("=" * 60)
         print(f"\nTotal issues detected: {total_issues}")
 
@@ -469,7 +481,7 @@ def main():
             print("Exiting without applying fixes")
             return
 
-        results = runner.apply_fixes(detected_issues, check_interfaces, check_eigrp)
+        results = runner.apply_fixes(detected_issues, check_interfaces, check_eigrp, check_ospf)
 
         # Final Summary
         print("\n" + "=" * 60)
@@ -487,6 +499,14 @@ def main():
         if check_eigrp:
             print("\nEIGRP Fixes Applied:")
             for device, fixed in results['eigrp'].items():
+                if fixed:
+                    print(f"  {device}: {len(fixed)} issue(s) - {', '.join(fixed)}")
+                else:
+                    print(f"  {device}: No fixes applied")
+
+        if check_ospf:
+            print("\nOSPF Fixes Applied:")
+            for device, fixed in results['ospf'].items():
                 if fixed:
                     print(f"  {device}: {len(fixed)} issue(s) - {', '.join(fixed)}")
                 else:
@@ -513,5 +533,6 @@ if __name__ == "__main__":
         traceback.print_exc()
 
         sys.exit(1)
+
 
 
