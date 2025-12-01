@@ -16,6 +16,7 @@ import time
 import socket
 from interface_tree import troubleshoot_device as troubleshoot_interfaces
 from eigrp_tree import troubleshoot_eigrp
+from ospf_tree import troubleshoot_ospf
 
 
 # Connection management functions
@@ -296,6 +297,65 @@ class DiagnosticRunner:
 
                 results['eigrp'][device_name] = fixed
 
+        if check_ospf:
+            for device_name, problems in detected_issues['ospf'].items():
+                if not problems:
+                    continue
+
+                tn = self.connections.get(device_name)
+                if not tn:
+                    print(f"\nNo connection to {device_name} - skipping")
+                    continue
+
+                fixed = []
+
+                print(f"\n{device_name} - OSPF Issues:")
+                print("-" * 60)
+
+                for issue in problems:
+                    issue_type = issue['type']
+                    print(f"\nProblem: {issue_type}")
+
+                    if 'line' in issue:
+                        print(f"  Details: {issue['line'][:80]}")
+
+                    response = input("Apply fix? (Y/n): ").strip().lower()
+
+                    if response == 'n':
+                        print("Skipping")
+                        continue
+
+                    # Generate fix commands
+                    fix_commands = []
+
+                   if issue_type == 'timer mismatch' or issue_type == 'non-default ospf-timers':
+                        interface = issue['interface']
+                        print("Fix: Resetting timer-values to default (10 40 40)")
+                        fix_commands = ["interface {interface}", "ip ospf hello-interval 10", "ip ospf dead-interval 40"]
+
+                    elif issue_type == 'passive interface':
+                        interface = issue['interface']
+                        print(f"Fix: Removing passive-interface for {interface}")
+                        fix_commands = ["router ospf 1", f"no passive-interface {interface}"]
+
+                    elif issue_type == 'stub configuration' or issue_type == 'stub mismatch':
+                        print("Fix: Removing OSPF stub configuration")
+                        fix_commands = ["router ospf 1", "no ospf stub"]
+
+                    elif issue_type == 'area mismatch':
+                        print("Note: Area mismatch - manual intervention required")
+                        continue
+
+                    if fix_commands:
+                        from ospf_tree import apply_ospf_fixes
+
+                        if apply_ospf_fixes(tn, fix_commands):
+                            print(f"Fixed: {issue_type}")
+                            fixed.append(issue_type)
+                    else:
+                            print(f"Failed to fix {issue_type}")
+
+                    results['ospf'][device_name] = fixed
         return results
 
 
@@ -334,12 +394,14 @@ def main():
     print("\nSelect diagnostic types to run:")
     print("  1. Interface diagnostics")
     print("  2. EIGRP diagnostics")
-    print("  3. Both (default)")
+    print("  3. OSPF diagnostics")
+    print("  4. all (default)")
 
     diag_choice = input("\nChoice (1/2/3): ").strip()
 
-    check_interfaces = diag_choice in ('1', '3', '')
-    check_eigrp = diag_choice in ('2', '3', '')
+    check_interfaces = diag_choice in ('1', '4', '')
+    check_eigrp = diag_choice in ('2', '4', '')
+    check_ospf = diag_choice in ('3', '4' , '')
 
     print("\nEnter device names to diagnose (comma-separated)")
     print("Example: R1,R2  or  R1, R2, R3")
@@ -449,4 +511,5 @@ if __name__ == "__main__":
         print(f"\nError: {e}")
         import traceback
         traceback.print_exc()
+
         sys.exit(1)
