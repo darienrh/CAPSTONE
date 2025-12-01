@@ -328,7 +328,7 @@ class DiagnosticRunner:
                     # Generate fix commands
                     fix_commands = []
 
-                   if issue_type == 'timer mismatch' or issue_type == 'non-default ospf-timers':
+                    if issue_type == 'timer mismatch' or issue_type == 'non-default ospf-timers':
                         interface = issue['interface']
                         print("Fix: Resetting timer-values to default (10 40 40)")
                         fix_commands = ["interface {interface}", "ip ospf hello-interval 10", "ip ospf dead-interval 40"]
@@ -513,3 +513,4 @@ if __name__ == "__main__":
         traceback.print_exc()
 
         sys.exit(1)
+
