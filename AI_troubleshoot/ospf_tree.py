@@ -64,7 +64,7 @@ def get_ospf_neighbors(tn):
     """Get OSPF neighbor information using existing connection"""
     try:
         clear_line_and_reset(tn)
-        tn.write(b'show ip ospf neighbors\r\n')
+        tn.write(b'show ip ospf neighbor\r\n')
         time.sleep(1)
         output = tn.read_very_eager().decode('ascii', errors='ignore')
         return output
