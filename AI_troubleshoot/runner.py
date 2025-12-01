@@ -397,7 +397,7 @@ def main():
     print("  3. OSPF diagnostics")
     print("  4. all (default)")
 
-    diag_choice = input("\nChoice (1/2/3): ").strip()
+    diag_choice = input("\nChoice (1/2/3/4): ").strip()
 
     check_interfaces = diag_choice in ('1', '4', '')
     check_eigrp = diag_choice in ('2', '4', '')
@@ -513,4 +513,5 @@ if __name__ == "__main__":
         traceback.print_exc()
 
         sys.exit(1)
+
 
