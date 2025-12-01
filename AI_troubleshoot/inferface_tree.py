@@ -63,7 +63,7 @@ def parse_interface_output(output):
         if len(parts) < 5:
             continue
 
-        if not parts[0].startswith(('FastEthernet', 'GigabitEthernet', 'Ethernet')):
+        if not parts[0].startswith(('FastEthernet', 'GigabitEthernet', 'Ethernet', 'Serial')):
             continue
 
         interface = parts[0]
