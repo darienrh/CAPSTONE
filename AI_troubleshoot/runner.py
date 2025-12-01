@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Network Diagnostic Runner - Optimized with Persistent Connections
+Network Diagnostic Runner - Fixed Connection & Case Sensitivity
 """
-
+ 
 import warnings
 warnings.filterwarnings('ignore')
-
+ 
 import requests
 from requests.auth import HTTPBasicAuth
 import sys
@@ -14,531 +14,292 @@ import signal
 import telnetlib
 import time
 import socket
+ 
+# UI Imports
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.prompt import Confirm
+ 
+# Custom imports (Ensure these files exist in the same folder)
 from interface_tree import troubleshoot_device as troubleshoot_interfaces
 from eigrp_tree import troubleshoot_eigrp
-from ospf_tree import troubleshoot_ospf
-
-
-# Connection management functions
+ 
+# Initialize Rich Console
+console = Console()
+ 
+# --- Connection Management ---
 def connect_device(console_port, timeout=5):
     """Establish telnet connection to a device"""
     try:
         tn = telnetlib.Telnet('localhost', console_port, timeout=timeout)
-        # Initial cleanup
         time.sleep(0.2)
-        tn.write(b'\x03')  # Ctrl+C
+        tn.write(b'\x03')
         time.sleep(0.1)
         tn.read_very_eager()
         tn.write(b'enable\r\n')
         time.sleep(0.1)
         tn.read_very_eager()
         return tn
-    except Exception as e:
-        print(f"Error connecting to port {console_port}: {e}")
+    except Exception:
         return None
-
-
+ 
 def close_device(tn):
-    """Close telnet connection properly"""
     if tn:
         try:
-            try:
-                tn.write(b'\x03')
-                time.sleep(0.1)
-                tn.read_very_eager()
-            except:
-                pass
-
-            try:
-                tn.write(b'end\r\n')
-                time.sleep(0.1)
-                tn.read_very_eager()
-            except:
-                pass
-
-            try:
-                tn.get_socket().shutdown(socket.SHUT_RDWR)
-            except:
-                pass
-
+            tn.write(b'end\r\n')
             tn.close()
         except:
             pass
-
-
+ 
 class DiagnosticRunner:
-
-    def __init__(self, gns3_url="http://localhost:3080", username="admin",
-                 password="qrWaprDfbrbUaYw8eMZTRz6cXRfV96PltLIT0gzTIMo7u5vksgVCIjz1iOSIbelS"):
+    def __init__(self, gns3_url="http://localhost:3080", username="admin", password="qrWaprDfbrbUaYw8eMZTRz6cXRfV96PltLIT0gzTIMo7u5vksgVCIjz1iOSIbelS"):
         self.gns3_url = gns3_url.rstrip('/')
         self.api_base = f"{self.gns3_url}/v2"
-        self.project_id = None
-        self.nodes = {}
+        # Try auth, but we will handle failures gracefully
         self.auth = HTTPBasicAuth(username, password) if username else None
-        self.connections = {}  # Track open connections
-
+        self.nodes = {}
+        self.connections = {} 
+ 
+    @staticmethod
+    def _get_eigrp_fix_commands(issue_type, issue_details):
+        if issue_type in ['k-value mismatch', 'non-default k-values']:
+            return ["router eigrp 1", "metric weights 0 1 0 1 0 0"]
+        elif issue_type == 'passive interface':
+            interface = issue_details.get('interface')
+            return ["router eigrp 1", f"no passive-interface {interface}"]
+        elif issue_type in ['stub configuration', 'stub mismatch']:
+            return ["router eigrp 1", "no eigrp stub"]
+        return []
+ 
     def connect(self):
-        """Connect to GNS3 and load project"""
+        """Connect to GNS3 with better error handling"""
+        console.print(f"[dim]Attempting connection to {self.api_base}...[/dim]")
+ 
         try:
-            response = requests.get(f"{self.api_base}/version", auth=self.auth, timeout=5)
-            if response.status_code != 200:
-                print("Failed to connect to GNS3")
+            # 1. Try to get version (Quick check)
+            try:
+                response = requests.get(f"{self.api_base}/version", auth=self.auth, timeout=2)
+            except requests.exceptions.ConnectionError:
+                console.print(f"[bold red]Error:[/bold red] Could not reach GNS3 at {self.gns3_url}")
+                console.print("[yellow]Hint:[/yellow] Is the GNS3 app running?")
                 return False
-
+ 
+            # Handle 401 Unauthorized by retrying without auth
+            if response.status_code == 401:
+                console.print("[yellow]Auth failed. Retrying without credentials...[/yellow]")
+                self.auth = None
+                response = requests.get(f"{self.api_base}/version", timeout=2)
+ 
+            if response.status_code != 200:
+                console.print(f"[bold red]API Error:[/bold red] Status Code {response.status_code}")
+                return False
+ 
             version = response.json().get('version', 'unknown')
-            print(f"Connected to GNS3 v{version}")
-
+            console.print(f"[green]Connected to GNS3 v{version}[/green]")
+ 
+            # 2. Get Projects
             response = requests.get(f"{self.api_base}/projects", auth=self.auth)
             projects = response.json()
-
+ 
+            project_found = False
             for project in projects:
                 if project['status'] == 'opened':
-                    self.project_id = project['project_id']
-                    print(f"Using project: {project['name']}")
-
-                    response = requests.get(f"{self.api_base}/projects/{self.project_id}/nodes", auth=self.auth)
+                    project_found = True
+                    console.print(f"[dim]Found active project: {project['name']}[/dim]")
+ 
+                    # 3. Get Nodes for the open project
+                    response = requests.get(f"{self.api_base}/projects/{project['project_id']}/nodes", auth=self.auth)
                     nodes = response.json()
-
+ 
+                    count = 0
                     for node in nodes:
                         if node['status'] == 'started':
                             self.nodes[node['name']] = node.get('console')
-
-                    print(f"Found {len(self.nodes)} running devices")
+                            count += 1
+ 
+                    if count == 0:
+                        console.print("[yellow]Warning:[/yellow] Project is open, but no devices are started.")
+                        console.print("[dim]Please start your devices in GNS3.[/dim]")
+                        return False
+ 
+                    console.print(f"[green]Found {count} running devices.[/green]")
                     return True
-
-            print("No opened project found")
-            return False
-
+ 
+            if not project_found:
+                console.print("[bold red]No open project found.[/bold red]")
+                console.print("[yellow]Hint:[/yellow] Open a project in the GNS3 GUI first.")
+                return False
+ 
         except Exception as e:
-            print(f"Error: {e}")
+            console.print(f"[bold red]Unexpected Connection Error:[/bold red] {e}")
             return False
-
-    def list_devices(self):
-        """List available devices"""
-        print("\nAvailable devices:")
-        for i, device in enumerate(sorted(self.nodes.keys()), 1):
-            print(f"  {i}. {device}")
-
-    def get_console_port(self, device_name):
-        """Get console port for device"""
-        return self.nodes.get(device_name)
-
+ 
     def cleanup_all_connections(self):
-        """Close all open telnet connections"""
-        for device_name, tn in self.connections.items():
-            print(f"Closing connection to {device_name}...")
+        for tn in self.connections.values():
             close_device(tn)
         self.connections.clear()
-
-    def run_diagnostics(self, device_names, check_interfaces=True, check_eigrp=True, check_ospf=True):
-        """Run diagnostics on specified devices - detection phase only"""
-        detected_issues = {
-            'interfaces': {},
-            'eigrp': {},
-            'ospf': {}
-        }
-
-        print("\n" + "=" * 60)
-        print("PHASE 1: DETECTING ISSUES")
-        print("=" * 60)
-
-        for device_name in device_names:
-            console_port = self.get_console_port(device_name)
-
-            if not console_port:
-                print(f"\nDevice {device_name} not found or not running")
-                continue
-
-            # Open ONE connection per device for entire diagnostic session
-            print(f"\nConnecting to {device_name}...")
-            tn = connect_device(console_port)
-
-            if not tn:
-                print(f"Failed to connect to {device_name}")
-                continue
-
-            # Store connection for later use and cleanup
-            self.connections[device_name] = tn
-
-            try:
-                if check_interfaces:
-                    problems, _ = troubleshoot_interfaces(device_name, tn, auto_prompt=False)
-                    detected_issues['interfaces'][device_name] = problems
-
-                if check_eigrp:
-                    problems, _ = troubleshoot_eigrp(device_name, tn, auto_prompt=False)
-                    detected_issues['eigrp'][device_name] = problems
-                if check_ospf:
-                    problems, _ = troubleshoot_ospf(device_name, tn, auto_prompt=False)
-                    detected_issues['ospf'][device_name] = problems
-            except Exception as e:
-                print(f"Error diagnosing {device_name}: {e}")
-                detected_issues['interfaces'][device_name] = []
-                detected_issues['eigrp'][device_name] = []
-                detected_issues['ospf'][device_name] = []
-
-        return detected_issues
-
-    def apply_fixes(self, detected_issues, check_interfaces=True, check_eigrp=True, check_ospf=True):
-        """Apply fixes for detected issues using existing connections"""
-        results = {
-            'interfaces': {},
-            'eigrp': {}
-        }
-
-        print("\n" + "=" * 60)
-        print("PHASE 2: APPLYING FIXES")
-        print("=" * 60)
-
-        # Fix interface issues
-        if check_interfaces:
-            for device_name, problems in detected_issues['interfaces'].items():
-                if not problems:
-                    continue
-
-                tn = self.connections.get(device_name)
+ 
+    def run_diagnostics(self, device_names, check_interfaces=True, check_eigrp=True):
+        detected_issues = {'interfaces': {}, 'eigrp': {}}
+ 
+        console.print("\n[bold cyan]PHASE 1: DETECTING ISSUES[/bold cyan]")
+ 
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TimeElapsedColumn(),
+            console=console
+        ) as progress:
+ 
+            task = progress.add_task("[cyan]Scanning devices...", total=len(device_names))
+ 
+            for device_name in device_names:
+                progress.update(task, description=f"[cyan]Scanning {device_name}...")
+ 
+                console_port = self.nodes.get(device_name)
+                # No need to check if port exists here, we filter in main()
+ 
+                tn = connect_device(console_port)
                 if not tn:
-                    print(f"\nNo connection to {device_name} - skipping")
+                    console.print(f"[red]Failed to connect to {device_name}[/red]")
+                    progress.advance(task)
                     continue
-
-                fixed = []
-
-                print(f"\n{device_name} - Interface Issues:")
-                print("-" * 60)
-
+ 
+                self.connections[device_name] = tn
+ 
+                try:
+                    if check_interfaces:
+                        probs, _ = troubleshoot_interfaces(device_name, tn, auto_prompt=False)
+                        detected_issues['interfaces'][device_name] = probs
+ 
+                    if check_eigrp:
+                        probs, _ = troubleshoot_eigrp(device_name, tn, auto_prompt=False)
+                        detected_issues['eigrp'][device_name] = probs
+                except Exception as e:
+                    console.print(f"[red]Error on {device_name}: {e}[/red]")
+ 
+                progress.advance(task)
+ 
+        return detected_issues
+ 
+    def print_summary_table(self, detected_issues):
+        table = Table(title="Diagnostic Results", show_header=True, header_style="bold magenta")
+        table.add_column("Device", style="cyan")
+        table.add_column("Category", style="yellow")
+        table.add_column("Issue", style="white")
+        table.add_column("Status", style="red")
+ 
+        has_issues = False
+ 
+        for device, problems in detected_issues['interfaces'].items():
+            for p in problems:
+                table.add_row(device, "Interface", p['interface'], "Admin Down")
+                has_issues = True
+ 
+        for device, problems in detected_issues['eigrp'].items():
+            for p in problems:
+                table.add_row(device, "EIGRP", p.get('line', 'N/A')[:30], p['type'])
+                has_issues = True
+ 
+        if has_issues:
+            console.print(table)
+        else:
+            console.print("\n[bold green]:check_mark: No issues found. Network is healthy![/bold green]")
+ 
+        return has_issues
+ 
+    def apply_fixes(self, detected_issues, check_interfaces=True, check_eigrp=True):
+        console.print("\n[bold cyan]PHASE 2: APPLYING FIXES[/bold cyan]")
+        results = []
+ 
+        if check_interfaces:
+            for device, problems in detected_issues['interfaces'].items():
+                if not problems: continue
+                tn = self.connections.get(device)
                 for problem in problems:
                     interface = problem['interface']
-                    print(f"\nProblem: {interface} administratively down")
-
-                    response = input("Apply fix? (Y/n): ").strip().lower()
-
-                    if response == 'n':
-                        print("Skipping")
-                        continue
-
-                    print(f"Applying no shutdown to {interface}...")
-
-                    # Import here to avoid circular import
-                    from interface_tree import fix_interface
-
-                    if fix_interface(tn, interface):
-                        print(f"Fixed: {interface}")
-                        fixed.append(interface)
-                    else:
-                        print(f"Failed to fix {interface}")
-
-                results['interfaces'][device_name] = fixed
-
-        # Fix EIGRP issues
-        if check_eigrp:
-            for device_name, problems in detected_issues['eigrp'].items():
-                if not problems:
-                    continue
-
-                tn = self.connections.get(device_name)
-                if not tn:
-                    print(f"\nNo connection to {device_name} - skipping")
-                    continue
-
-                fixed = []
-
-                print(f"\n{device_name} - EIGRP Issues:")
-                print("-" * 60)
-
-                for issue in problems:
-                    issue_type = issue['type']
-                    print(f"\nProblem: {issue_type}")
-
-                    if 'line' in issue:
-                        print(f"  Details: {issue['line'][:80]}")
-
-                    response = input("Apply fix? (Y/n): ").strip().lower()
-
-                    if response == 'n':
-                        print("Skipping")
-                        continue
-
-                    # Generate fix commands
-                    fix_commands = []
-
-                    if issue_type == 'k-value mismatch' or issue_type == 'non-default k-values':
-                        print("Fix: Resetting K-values to default")
-                        fix_commands = [
-                            "router eigrp 1",
-                            "metric weights 0 1 0 1 0 0"
-                        ]
-
-                    elif issue_type == 'passive interface':
-                        interface = issue['interface']
-                        print(f"Fix: Removing passive-interface {interface}")
-                        fix_commands = [
-                            "router eigrp 1",
-                            f"no passive-interface {interface}"
-                        ]
-
-                    elif issue_type == 'stub configuration' or issue_type == 'stub mismatch':
-                        print("Fix: Removing EIGRP stub")
-                        fix_commands = [
-                            "router eigrp 1",
-                            "no eigrp stub"
-                        ]
-
-                    elif issue_type == 'as mismatch':
-                        print("Note: AS mismatch - manual intervention required")
-                        continue
-
-                    elif issue_type == 'authentication mismatch':
-                        print("Note: Auth mismatch - manual intervention required")
-                        continue
-
-                    if fix_commands:
-                        from eigrp_tree import apply_eigrp_fixes
-
-                        if apply_eigrp_fixes(tn, fix_commands):
-                            print(f"Fixed: {issue_type}")
-                            fixed.append(issue_type)
+                    console.print(f"\n[yellow]Device:[/yellow] {device} | [yellow]Issue:[/yellow] {interface} is Down")
+                    if Confirm.ask("Apply 'no shutdown'?"):
+                        from interface_tree import fix_interface
+                        if fix_interface(tn, interface):
+                            console.print(f"[green]✔ Fixed {interface}[/green]")
+                            results.append([device, "Interface", interface, "Fixed"])
                         else:
-                            print(f"Failed to fix {issue_type}")
-
-                results['eigrp'][device_name] = fixed
-
-        if check_ospf:
-            for device_name, problems in detected_issues['ospf'].items():
-                if not problems:
-                    continue
-
-                tn = self.connections.get(device_name)
-                if not tn:
-                    print(f"\nNo connection to {device_name} - skipping")
-                    continue
-
-                fixed = []
-
-                print(f"\n{device_name} - OSPF Issues:")
-                print("-" * 60)
-
+                            console.print(f"[red]✘ Failed to fix {interface}[/red]")
+ 
+        if check_eigrp:
+            for device, problems in detected_issues['eigrp'].items():
+                if not problems: continue
+                tn = self.connections.get(device)
                 for issue in problems:
                     issue_type = issue['type']
-                    print(f"\nProblem: {issue_type}")
-
-                    if 'line' in issue:
-                        print(f"  Details: {issue['line'][:80]}")
-
-                    response = input("Apply fix? (Y/n): ").strip().lower()
-
-                    if response == 'n':
-                        print("Skipping")
+                    console.print(f"\n[yellow]Device:[/yellow] {device} | [yellow]Issue:[/yellow] {issue_type}")
+                    fix_commands = self._get_eigrp_fix_commands(issue_type, issue)
+                    if not fix_commands:
+                        console.print(f"[bold red]Manual intervention required[/bold red]")
                         continue
-
-                    # Generate fix commands
-                    fix_commands = []
-
-                    if issue_type == 'timer mismatch' or issue_type == 'non-default ospf-timers':
-                        interface = issue['interface']
-                        print("Fix: Resetting timer-values to default (10 40 40)")
-                        fix_commands = ["interface {interface}", "ip ospf hello-interval 10", "ip ospf dead-interval 40"]
-
-                    elif issue_type == 'passive interface':
-                        interface = issue['interface']
-                        print(f"Fix: Removing passive-interface for {interface}")
-                        fix_commands = ["router ospf 1", f"no passive-interface {interface}"]
-
-                    elif issue_type == 'stub configuration' or issue_type == 'stub mismatch':
-                        print("Fix: Removing OSPF stub configuration")
-                        fix_commands = ["router ospf 1", "no ospf stub"]
-
-                    elif issue_type == 'area mismatch':
-                        print("Note: Area mismatch - manual intervention required")
-                        continue
-
-                    if fix_commands:
-                        from ospf_tree import apply_ospf_fixes
-
-                        if apply_ospf_fixes(tn, fix_commands):
-                            print(f"Fixed: {issue_type}")
-                            fixed.append(issue_type)
-                    else:
-                            print(f"Failed to fix {issue_type}")
-
-                    results['ospf'][device_name] = fixed
+                    if Confirm.ask(f"Apply fix?"):
+                        from eigrp_tree import apply_eigrp_fixes
+                        if apply_eigrp_fixes(tn, fix_commands):
+                            console.print(f"[green]✔ Fixed {issue_type}[/green]")
+                            results.append([device, "EIGRP", issue_type, "Fixed"])
+                        else:
+                            console.print(f"[red]✘ Failed to fix {issue_type}[/red]")
         return results
-
-
+ 
 def main():
     runner = DiagnosticRunner()
-
-    # Register cleanup handler
-    def cleanup():
-        runner.cleanup_all_connections()
-
-    atexit.register(cleanup)
-
-    # Handle Ctrl+C gracefully
-    def signal_handler(sig, frame):
-        print("\n\nInterrupted - cleaning up connections...")
-        cleanup()
-        sys.exit(0)
-
-    signal.signal(signal.SIGINT, signal_handler)
-
-    print("\nNetwork Diagnostic Tool")
-    print("=" * 60)
-
+    atexit.register(runner.cleanup_all_connections)
+ 
+    console.print("[bold blue]Network Diagnostic Tool[/bold blue]", justify="center")
+ 
+    # 1. Connection Check
     if not runner.connect():
         sys.exit(1)
-
-    runner.list_devices()
-
-    print("\n" + "=" * 60)
-    response = input("Run diagnostics? (Y/n): ").strip().lower()
-
-    if response == 'n':
-        print("Exiting")
-        sys.exit(0)
-
-    print("\nSelect diagnostic types to run:")
-    print("  1. Interface diagnostics")
-    print("  2. EIGRP diagnostics")
-    print("  3. OSPF diagnostics")
-    print("  4. All (default)")
-
-    diag_choice = input("\nChoice (1/2/3/4): ").strip()
-
-    check_interfaces = diag_choice in ('1', '4', '')
-    check_eigrp = diag_choice in ('2', '4', '')
-    check_ospf = diag_choice in ('3', '4' , '')
-
-    print("\nEnter device names to diagnose (comma-separated)")
-    print("Example: R1,R2  or  R1, R2, R3")
-    print("Press Enter for all devices")
-
-    device_input = input("\nDevices: ").strip()
-
-    if device_input:
-        device_names = [d.strip() for d in device_input.split(',')]
-        invalid_devices = [d for d in device_names if d not in runner.nodes]
-        if invalid_devices:
-            print(f"\nInvalid devices: {', '.join(invalid_devices)}")
-            sys.exit(1)
+ 
+    # 2. Case-Insensitive Device Selection
+    available_devices = list(runner.nodes.keys()) # e.g. ['R1', 'R2']
+ 
+    # Create a map: {'r1': 'R1', 'r2': 'R2'}
+    device_map = {name.lower(): name for name in available_devices}
+ 
+    console.print(f"\nAvailable: [green]{', '.join(available_devices)}[/green]")
+    user_input = console.input("Enter devices (e.g. 'r1, r2') or Press Enter for all: ").strip()
+ 
+    final_target_list = []
+ 
+    if not user_input:
+        final_target_list = available_devices
     else:
-        device_names = list(runner.nodes.keys())
-
-    print(f"\nRunning diagnostics on: {', '.join(device_names)}")
-    print("=" * 60)
-
-    try:
-        # Phase 1: Detect all issues (opens connections)
-        detected_issues = runner.run_diagnostics(device_names, check_interfaces, check_eigrp, check_ospf)
-
-        # Show detection summary
-        print("\n" + "=" * 60)
-        print("DETECTION SUMMARY")
-        print("=" * 60)
-
-        total_issues = 0
-
-        if check_interfaces:
-            print("\nInterface Issues:")
-            for device, problems in detected_issues['interfaces'].items():
-                if problems:
-                    print(f"  {device}: {len(problems)} issue(s)")
-                    for p in problems:
-                        print(f"    - {p['interface']}: {p['status']}")
-                    total_issues += len(problems)
-                else:
-                    print(f"  {device}: No issues")
-
-        if check_eigrp:
-            print("\nEIGRP Issues:")
-            for device, problems in detected_issues['eigrp'].items():
-                if problems:
-                    print(f"  {device}: {len(problems)} issue(s)")
-                    for p in problems:
-                        print(f"    - {p['type']}")
-                    total_issues += len(problems)
-                else:
-                    print(f"  {device}: No issues")
-
-        
-        if check_ospf:
-            print("\nOSPF Issues:")
-            for device, problems in detected_issues['ospf'].items():
-                if problems:
-                    print(f"  {device}: {len(problems)} issue(s)")
-                    for p in problems:
-                        print(f"    - {p['type']}")
-                    total_issues += len(problems)
-                else:
-                    print(f"  {device}: No issues")
-
-        print("=" * 60)
-        print(f"\nTotal issues detected: {total_issues}")
-
-        if total_issues == 0:
-            print("\nNo issues found - network is healthy!")
-            return
-
-        # Phase 2: Apply fixes (reuses existing connections)
-        print("\n" + "=" * 60)
-        response = input("Proceed with fixes? (Y/n): ").strip().lower()
-
-        if response == 'n':
-            print("Exiting without applying fixes")
-            return
-
-        results = runner.apply_fixes(detected_issues, check_interfaces, check_eigrp, check_ospf)
-
-        # Final Summary
-        print("\n" + "=" * 60)
-        print("FINAL SUMMARY")
-        print("=" * 60)
-
-        if check_interfaces:
-            print("\nInterface Fixes Applied:")
-            for device, fixed in results['interfaces'].items():
-                if fixed:
-                    print(f"  {device}: {len(fixed)} interface(s) - {', '.join(fixed)}")
-                else:
-                    print(f"  {device}: No fixes applied")
-
-        if check_eigrp:
-            print("\nEIGRP Fixes Applied:")
-            for device, fixed in results['eigrp'].items():
-                if fixed:
-                    print(f"  {device}: {len(fixed)} issue(s) - {', '.join(fixed)}")
-                else:
-                    print(f"  {device}: No fixes applied")
-
-        if check_ospf:
-            print("\nOSPF Fixes Applied:")
-            for device, fixed in results['ospf'].items():
-                if fixed:
-                    print(f"  {device}: {len(fixed)} issue(s) - {', '.join(fixed)}")
-                else:
-                    print(f"  {device}: No fixes applied")
-
-        print("=" * 60)
-        print("\nDiagnostics complete")
-
-    finally:
-        # Always cleanup connections at the end
-        print("\nClosing all device connections...")
-        runner.cleanup_all_connections()
-
-
+        # Split input and clean whitespace
+        requested_devices = [d.strip().lower() for d in user_input.split(',')]
+ 
+        for req in requested_devices:
+            if req in device_map:
+                # Append the REAL name (e.g. 'R1') not the user input (e.g. 'r1')
+                final_target_list.append(device_map[req])
+            else:
+                console.print(f"[yellow]Warning: '{req}' not found. Skipping.[/yellow]")
+ 
+    if not final_target_list:
+        console.print("[bold red]No valid devices selected. Exiting.[/bold red]")
+        sys.exit(1)
+ 
+    console.print(f"[dim]Running on: {', '.join(final_target_list)}[/dim]")
+ 
+    # 3. Execution
+    detected_issues = runner.run_diagnostics(final_target_list)
+    has_issues = runner.print_summary_table(detected_issues)
+ 
+    if has_issues and Confirm.ask("\nProceed to fix menu?"):
+        runner.apply_fixes(detected_issues)
+        console.print("\n[bold green]Done.[/bold green]")
+ 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n\nInterrupted")
+        console.print("\n[bold red]Interrupted[/bold red]")
         sys.exit(0)
-    except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-        traceback.print_exc()
-
-        sys.exit(1)
-
-
-
-
