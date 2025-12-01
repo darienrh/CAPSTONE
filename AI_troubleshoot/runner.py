@@ -130,11 +130,12 @@ class DiagnosticRunner:
             close_device(tn)
         self.connections.clear()
 
-    def run_diagnostics(self, device_names, check_interfaces=True, check_eigrp=True):
+    def run_diagnostics(self, device_names, check_interfaces=True, check_eigrp=True, check_ospf=True):
         """Run diagnostics on specified devices - detection phase only"""
         detected_issues = {
             'interfaces': {},
-            'eigrp': {}
+            'eigrp': {},
+            'ospf': {}
         }
 
         print("\n" + "=" * 60)
@@ -167,14 +168,18 @@ class DiagnosticRunner:
                 if check_eigrp:
                     problems, _ = troubleshoot_eigrp(device_name, tn, auto_prompt=False)
                     detected_issues['eigrp'][device_name] = problems
+                if check_ospf:
+                    problems, _ = troubleshoot_ospf(device_name, tn, auto_prompt=False)
+                    detected_issues['ospf'][device_name] = problems
             except Exception as e:
                 print(f"Error diagnosing {device_name}: {e}")
                 detected_issues['interfaces'][device_name] = []
                 detected_issues['eigrp'][device_name] = []
+                detected_issues['ospf'][device_name] = []
 
         return detected_issues
 
-    def apply_fixes(self, detected_issues, check_interfaces=True, check_eigrp=True):
+    def apply_fixes(self, detected_issues, check_interfaces=True, check_eigrp=True, check_ospf=True):
         """Apply fixes for detected issues using existing connections"""
         results = {
             'interfaces': {},
@@ -533,6 +538,7 @@ if __name__ == "__main__":
         traceback.print_exc()
 
         sys.exit(1)
+
 
 
 
