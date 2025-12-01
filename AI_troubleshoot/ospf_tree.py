@@ -296,11 +296,11 @@ def troubleshoot_ospf(device_name, tn, auto_prompt=True):
         elif issue_type == 'passive interface':
             interface = issue['interface']
             print(f"Fix: Removing passive-interface for {interface}")
-            fix_commands = ["router ospf 1", f"no passive-interface {interface}"]
+            fix_commands = ["router ospf 10", f"no passive-interface {interface}"]
 
         elif issue_type == 'stub configuration' or issue_type == 'stub mismatch':
             print("Fix: Removing OSPF stub configuration")
-            fix_commands = ["router ospf 1", "no ospf stub"]
+            fix_commands = ["router ospf 10", "no ospf stub"]
 
         elif issue_type == 'area mismatch':
             print("Note: Area mismatch - manual intervention required")
