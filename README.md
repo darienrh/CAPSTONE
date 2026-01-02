@@ -17,7 +17,7 @@ Slides:
 https://drive.google.com/drive/folders/1iNbugmg0TK6bgDJ0iECrnOcb9gcPbOUQ?usp=drive_link
 
 ----------------------------------------------------------------------------------------------------------
-WORK TO DO: 
+# WORK TO DO: 
 1. knowledge_base.py
 - Create _initialize_basic_rules() with 10-15 rules from existing trees
 - Implement get_matching_rules() with basic pattern matching
