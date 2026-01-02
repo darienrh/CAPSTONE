@@ -19,38 +19,38 @@ https://drive.google.com/drive/folders/1iNbugmg0TK6bgDJ0iECrnOcb9gcPbOUQ?usp=dri
 ----------------------------------------------------------------------------------------------------------
 WORK TO DO: 
 1. knowledge_base.py
-Create _initialize_basic_rules() with 10-15 rules from existing trees
-Implement get_matching_rules() with basic pattern matching
-Create add_problem_solution_pair() for history tracking
-Test file runs independently (can create instance and call methods)
+- Create _initialize_basic_rules() with 10-15 rules from existing trees
+- Implement get_matching_rules() with basic pattern matching
+- Create add_problem_solution_pair() for history tracking
+- Test file runs independently (can create instance and call methods)
 
 2. fix_recommender.py
-Complete _load_fix_templates() with 10-15 templates
-Implement customize_fix() method with placeholder replacement
-Create basic validate_fix() logic with simple safety checks
-Test template loading and customization independently
+- Complete _load_fix_templates() with 10-15 templates
+- Implement customize_fix() method with placeholder replacement
+- Create basic validate_fix() logic with simple safety checks
+- Test template loading and customization independently
 
 3. detection/init.py
-Add symptoms extraction logic to Problem class
-Add to_ai_format() method to Problem class
-Update standardize_problem_dict() to include AI fields
-Test with sample problem data
+- Add symptoms extraction logic to Problem class
+- Add to_ai_format() method to Problem class
+- Update standardize_problem_dict() to include AI fields
+- Test with sample problem data
 
 4. eigrp_tree.py (Testing/Fixing)
-Test check_eigrp_interface_timers() with missing baseline data
-Add severity scoring to troubleshoot_eigrp() output
-Fix debug parsing for ambiguous error messages
-Ensure all problems use standardized format from Step 3
+- Test check_eigrp_interface_timers() with missing baseline data
+- Add severity scoring to troubleshoot_eigrp() output
+- Fix debug parsing for ambiguous error messages
+- Ensure all problems use standardized format from Step 3
 
 5. ospf_tree.py (Testing/Fixing)
-Fix check_ospf_enabled_interfaces() network matching logic
-Update check_area_assignments() to use real baseline lookup
-Refine router ID conflict detection
-Ensure all problems use standardized format from Step 3
+- Fix check_ospf_enabled_interfaces() network matching logic
+- Update check_area_assignments() to use real baseline lookup
+- Refine router ID conflict detection
+- Ensure all problems use standardized format from Step 3
 
 6. interface_tree.py (Testing/Fixing)
-Ensure all outputs use Problem class format from Step 3
-Add severity scoring based on interface criticality
-Test all detection functions work correctly
-Verify standardized output format
+- Ensure all outputs use Problem class format from Step 3
+- Add severity scoring based on interface criticality
+- Test all detection functions work correctly
+- Verify standardized output format
 
