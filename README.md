@@ -41,16 +41,18 @@ https://drive.google.com/drive/folders/1iNbugmg0TK6bgDJ0iECrnOcb9gcPbOUQ?usp=dri
 - Add severity scoring to troubleshoot_eigrp() output
 - Fix debug parsing for ambiguous error messages
 - Ensure all problems use standardized format from Step 3
+- create test script injecting all errors in the tree and fix any problems that are not correctly diagnosed or fixed. 
 
 5. ospf_tree.py (Testing/Fixing)
 - Fix check_ospf_enabled_interfaces() network matching logic
 - Update check_area_assignments() to use real baseline lookup
 - Refine router ID conflict detection
 - Ensure all problems use standardized format from Step 3
+- create test script injecting all errors in the tree and fix any problems that are not correctly diagnosed or fixed.
 
 6. interface_tree.py (Testing/Fixing)
 - Ensure all outputs use Problem class format from Step 3
 - Add severity scoring based on interface criticality
 - Test all detection functions work correctly
 - Verify standardized output format
-
+- create test script injecting all errors in the tree and fix any problems that are not correctly diagnosed or fixed.
