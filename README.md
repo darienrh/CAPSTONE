@@ -18,41 +18,107 @@ https://drive.google.com/drive/folders/1iNbugmg0TK6bgDJ0iECrnOcb9gcPbOUQ?usp=dri
 
 ----------------------------------------------------------------------------------------------------------
 # WORK TO DO: 
-1. knowledge_base.py
-- Create _initialize_basic_rules() with 10-15 rules from existing trees
-- Implement get_matching_rules() with basic pattern matching
-- Create add_problem_solution_pair() for history tracking
-- Test file runs independently (can create instance and call methods)
+# PHASE 1: Core AI Infrastructure
 
-2. fix_recommender.py
-- Complete _load_fix_templates() with 10-15 templates
-- Implement customize_fix() method with placeholder replacement
-- Create basic validate_fix() logic with simple safety checks
-- Test template loading and customization independently
+1. inference_engine.py 
+- Basic implementation (DONE)
 
-3. detection/init.py
-- Add symptoms extraction logic to Problem class
-- Add to_ai_format() method to Problem class
-- Update standardize_problem_dict() to include AI fields
-- Test with sample problem data
+REMAINING:
+- Add Bayesian confidence propagation for better probability updates
+- Implement forward chaining for symptom → root cause
+- Add backward chaining for "why" explanations
+- Create conflict resolution for competing rules
+- Test with real problem scenarios from your trees
 
-4. eigrp_tree.py (Testing/Fixing)
-- Test check_eigrp_interface_timers() with missing baseline data
-- Add severity scoring to troubleshoot_eigrp() output
-- Fix debug parsing for ambiguous error messages
-- Ensure all problems use standardized format from Step 3
-- create test script injecting all errors in the tree and fix any problems that are not correctly diagnosed or fixed. 
+2. knowledge_base.py
+- 17 basic rules already initialized (DONE)
+- Pattern matching implemented (DONE)
+- History tracking works (DONE)
 
-5. ospf_tree.py (Testing/Fixing)
-- Fix check_ospf_enabled_interfaces() network matching logic
-- Update check_area_assignments() to use real baseline lookup
-- Refine router ID conflict detection
-- Ensure all problems use standardized format from Step 3
-- create test script injecting all errors in the tree and fix any problems that are not correctly diagnosed or fixed.
+REMAINING:
+- Add rule chaining (e.g., "interface down" → "no EIGRP neighbor")
+- Implement rule priority/conflict resolution
+- Add temporal reasoning (time-based patterns)
+- Create rule validation/consistency checking
+- TEST: Load KB, query rules for each problem type, verify correct matches
 
-6. interface_tree.py (Testing/Fixing)
-- Ensure all outputs use Problem class format from Step 3
-- Add severity scoring based on interface criticality
-- Test all detection functions work correctly
-- Verify standardized output format
-- create test script injecting all errors in the tree and fix any problems that are not correctly diagnosed or fixed.
+3. fix_recommender.py
+- Template system implemented (DONE)
+- KB integration working (DONE)
+
+REMAINING:
+- Add 10+ more fix templates (currently only 2)
+- Implement dependency tracking between fixes
+- Add rollback command generation
+- Create fix validation with pre-condition checking
+- TEST: Generate fixes for each problem type, verify commands are correct
+
+-----------------------------------------------------------------------------------------
+# PHASE 2: Integration Layer
+1. problem_detector.py
+- base implementation with problem and problemDector classes (DONE)
+
+REMAINING:
+- Update scan_device() to wrap problems in Problem class
+- Add to_ai_format() conversion before sending to inference engine
+- Create standardize_problem_dict() utility function
+- TEST: Scan device, verify Problem objects created correctly
+
+2. fix_applier.py
+- Basic application logic works
+
+REMAINING:
+- Add pre-flight validation (call fix_recommender.validate_fix())
+- Implement rollback on failure
+- Add verification after each fix
+- Log all fixes to knowledge base for learning
+- TEST: Apply each fix type, verify success and rollback works
+
+-----------------------------------------------------------------------------------------
+# PHASE 3: Detection Tree Migration
+
+1. interface_tree.py
+
+REMAINING:
+- add severity field to all problems
+- Wrap outputs in Problem class
+- Add confidence scoring
+- TEST SCRIPT: Inject all interface errors, verify detection + fixes work
+
+2. eigrp_tree.py
+
+REMAINING:
+- Add severity levels:
+	- as mismatch: critical
+	- k-value mismatch: high
+	- hello timer mismatch: medium
+	- passive interface: low
+- Add confidence scoring based on evidence strength
+- Handle ambiguous debug output better
+- Return Problem objects instead of raw dicts
+
+3. ospf_tree.py
+- use ConfigManager's baseline directly
+- Fix check_ospf_enabled_interfaces() network matching
+- Improve router ID conflict detection (check for INIT state neighbors)
+- Add severity/confidence to all problems
+- Return Problem objects
+- TEST SCRIPT: Inject all OSPF errors, verify detection + fixes
+
+-----------------------------------------------------------------------------------------
+# PHASE 4: AI Integration & Testing
+
+1. runner.py
+- Integrate inference engine into diagnostic flow
+- Add diagnosis explanation to reporter
+- Show AI confidence levels
+- Allow user to accept/reject AI recommendations
+- TEST: Run full diagnostic cycle, verify AI provides useful insights
+
+reporter.py
+- create print_diagnosis method
+- create print_fix_recommendations method
+- Display reasoning explanation, Add "Why?" option to show inference chain
+
+-----------------------------------------------------------------------------------------
+# PHASE 5: Machine Learning + IDS
