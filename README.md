@@ -13,7 +13,7 @@ https://docs.google.com/document/d/1klzsvzyUgRslUVBO2lblb3iecVZh41ny0jOE0XMu3iU/
 Slides:
 [https://docs.google.com/presentation/d/13dbNv432SCjMt1cS9xIPTxJNGedKuvg60prSWrYMbsk/edit?slide=id.p1#slide=id.p1](https://cmailcarletonca-my.sharepoint.com/:p:/r/personal/darienramirezhenness_cmail_carleton_ca/_layouts/15/Doc.aspx?sourcedoc=%7B7C15372C-24E8-4236-BC00-AC3A90A87E15%7D&file=CAPSTONE%20AI%20ASSISTED%20TROUBLESHOOTER.pptx&action=edit&mobileredirect=true)
 ----------------------------------------------------------------------------------------------------------
-# Download Latest VM image to make thing easier (jan 02 2026) 
+# Download Latest VM image to make thing easier (jan 03 2026) 
 https://drive.google.com/drive/folders/1iNbugmg0TK6bgDJ0iECrnOcb9gcPbOUQ?usp=drive_link
 
 ----------------------------------------------------------------------------------------------------------
