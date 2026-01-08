@@ -63,7 +63,7 @@ detection/interface_tree.py
 - Add more descriptive error messages
 
 detection/eigrp_tree.py
-- Test and fix timer fix commands on real routers
+- Test and fix timer fix commands on routers R1-R6
 - Verify get_eigrp_fix_commands() generates correct command syntax
 - Ensure AS number is used correctly in all timer commands
 - Handle missing baseline data without crashing
@@ -72,7 +72,7 @@ detection/eigrp_tree.py
 - Document expected vs actual timer formats
 
 detection/ospf_tree.py
-- Test and fix timer fix commands on real routers
+- Test and fix timer fix commands on routers R1-R6
 - Verify hello/dead interval commands work correctly
 - Implement automatic router ID conflict resolution
 - Improve area mismatch detection accuracy
