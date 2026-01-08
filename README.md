@@ -58,93 +58,85 @@ detection/problem_detector.py
 
 detection/interface_tree.py
 - Validate IP configs before comparing to baseline
-- - Handle interfaces without baseline data gracefully
-Add test cases for edge conditions
-Add more descriptive error messages
+- Handle interfaces without baseline data gracefully
+- Add test cases for edge conditions
+- Add more descriptive error messages
 
 detection/eigrp_tree.py
-
-Test and fix timer fix commands on real routers
-Verify get_eigrp_fix_commands() generates correct command syntax
-Ensure AS number is used correctly in all timer commands
-Handle missing baseline data without crashing
-Add validation before applying network statement changes
-Test all fix commands on live routers
-Document expected vs actual timer formats
+- Test and fix timer fix commands on real routers
+- Verify get_eigrp_fix_commands() generates correct command syntax
+- Ensure AS number is used correctly in all timer commands
+- Handle missing baseline data without crashing
+- Add validation before applying network statement changes
+- Test all fix commands on routers R1-R6
+- Document expected vs actual timer formats
 
 detection/ospf_tree.py
-
-Test and fix timer fix commands on real routers
-Verify hello/dead interval commands work correctly
-Implement automatic router ID conflict resolution
-Improve area mismatch detection accuracy
-Add better duplicate RID resolution logic
-Test all fix commands on live routers
-Document OSPF area design expectations
+- Test and fix timer fix commands on real routers
+- Verify hello/dead interval commands work correctly
+- Implement automatic router ID conflict resolution
+- Improve area mismatch detection accuracy
+- Add better duplicate RID resolution logic
+- Test all fix commands on live routers
+- Document OSPF area design expectations
 
 
 Resolution Modules
 resolution/fix_applier.py
-
-Accept fix_recommender parameter in __init__
-Add _apply_fix_plan() method for AI-generated plans
-Add _apply_single_fix() helper method
-Call fix_recommender.validate_fix() before applying changes
-Call fix_recommender.learn_from_fix_result() after applying
-Add rollback capability on partial failure
-Improve verification logic after fix application
-Add transaction support (all-or-nothing for multi-step fixes)
-Add tests for fix application
+- Accept fix_recommender parameter in __init__
+- Add _apply_fix_plan() method for AI-generated plans
+- Add _apply_single_fix() helper method
+- Call fix_recommender.validate_fix() before applying changes
+- Call fix_recommender.learn_from_fix_result() after applying
+- Add rollback capability on partial failure
+- Improve verification logic after fix application
+- Add transaction support (all-or-nothing for multi-step fixes)
+- Add tests for fix application
 
 resolution/fix_recommender.py
-
-Implement learn_from_fix_result() method
-Improve _calculate_similarity() accuracy
-Add more fix templates for common issues
-Better prerequisite checking logic
-More accurate risk assessment algorithms
-Integrate with main workflow in runner
-Document fix plan format
+- Implement learn_from_fix_result() method
+- Improve _calculate_similarity() accuracy
+- Add more fix templates for common issues
+- Better prerequisite checking logic
+- More accurate risk assessment algorithms
+- Integrate with main workflow in runner
+- Document fix plan format
 
 
 Utility Modules
 utils/telnet_utils.py
-
-Add retry logic for failed commands
-Better timeout handling
-Add connection pooling for efficiency
-Add mock telnet implementation for testing
-Document all functions with examples
+- Add retry logic for failed commands
+- Better timeout handling
+- Add connection pooling for efficiency
+- Add mock telnet implementation for testing
+- Document all functions with examples
 
 utils/reporter.py
-
-Add AI confidence visualization in tables
-Add reasoning chain display in output
-Show ML predictions vs rule-based predictions
-Add charts for problem trends over time
-Improve report formatting
+- Add AI confidence visualization in tables
+- Add reasoning chain display in output
+- Show ML predictions vs rule-based predictions
+- Add charts for problem trends over time
+- Improve report formatting
 
 utils/network_utils.py
-
-Add IPv6 support
-Add unit tests for all functions
-Add usage examples in docstrings
+- Add IPv6 support?
+- Add unit tests for all functions
+- Add usage examples in docstrings
 
 
 Main Runner
 runner.py
-
-Initialize InferenceEngine in __init__
-Initialize FixRecommender in __init__
-Pass AI components to ProblemDetector
-Pass AI components to FixApplier
-Add train_ml_model() method
-Add uncertainty handling in run_diagnostics()
-Display AI reasoning in results output
-Fix restore timeout issues in parallel mode
-Better error handling in GNS3 connection
-Add validation before destructive changes
-Improve connection cleanup on errors
-Add menu option for training mode
-Show confidence scores in diagnostic output
-Add help text for all menu options
+- Initialize InferenceEngine in __init__
+- Initialize FixRecommender in __init__
+- Pass AI components to ProblemDetector
+- Pass AI components to FixApplier
+- Add train_ml_model() method
+- Add uncertainty handling in run_diagnostics()
+- Display AI reasoning in results output
+- Fix restore timeout issues in parallel mode
+- Better error handling in GNS3 connection
+- Add validation before destructive changes
+- Improve connection cleanup on errors
+- Add menu option for training mode
+- Show confidence scores in diagnostic output
+- Add help text for all menu options
