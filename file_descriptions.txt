@@ -1,0 +1,127 @@
+runner.py (main)
+├── core/config_manager.py
+├── core/knowledge_base.py
+├── detection/problem_detector.py
+│   ├── detection/interface_tree.py
+│   ├── detection/eigrp_tree.py
+│   └── detection/ospf_tree.py
+├── resolution/fix_applier.py
+├── resolution/fix_recommender.py (not used in runner yet)
+├── utils/telnet_utils.py
+├── utils/reporter.py
+└── utils/network_utils.py
+
+---------------------------------------------------------------------------------------------
+config_manager.py
+
+- Manages baseline configurations stored in ~/Capstone_AI/history/configs/
+- Parses router configs into structured format (EIGRP, OSPF, interfaces)
+- Provides expected values for validation (AS numbers, K-values, timers, router IDs)
+- Handles config comparison and versioning
+
+knowledge_base.py
+
+- Central repository of troubleshooting rules (INT_001, EIGRP_001, OSPF_001, etc.)
+- Stores problem-solution history with success rates
+- Learns from past fixes to adjust rule confidence scores
+- Exports/imports knowledge in JSON format
+- Contains ~17 predefined rules covering interface, EIGRP, and OSPF issues
+
+inference_engine.py
+
+- Diagnoses problems by matching symptoms to knowledge base rules
+- Recommends fixes with confidence scores and risk assessments
+- Performs reasoning chains (e.g., "interface down → blocks EIGRP adjacency")
+- Prioritizes fixes based on severity, impact, risk, and complexity
+- Detects conflicting fixes and predicts outcomes
+
+2. Detection Modules (detection/)
+problem_detector.py
+
+- Orchestrates all detection modules
+- Manages parallel scanning across multiple devices
+- Correlates problems (e.g., interface down causing EIGRP issues)
+- Calculates network health scores
+
+interface_tree.py
+
+- Detects shutdown interfaces that should be up
+- Identifies IP address mismatches and missing IPs
+- Compares current state against baseline configurations
+
+eigrp_tree.py
+
+- Checks AS number mismatches
+- Validates K-values (metric weights)
+- Detects timer mismatches (hello/hold intervals)
+- Identifies stub configuration issues
+- Validates network statements and passive interfaces
+- Uses debug output when no neighbors found
+
+ospf_tree.py
+
+- Checks process ID mismatches
+- Validates router IDs and detects duplicates
+- Detects timer mismatches (hello/dead intervals)
+- Validates area assignments and stub areas
+- Checks passive interfaces and network statements
+- Monitors for neighbors stuck in INIT/DOWN states
+
+3. Resolution Modules (resolution/)
+fix_applier.py
+
+- Applies fixes to devices via telnet
+- Handles interface, EIGRP, and OSPF fixes separately
+- Verifies fixes after application
+- Supports auto-approve or interactive mode
+- Tracks all applied fixes for reporting
+
+fix_recommender.py
+
+- Generates fix recommendations from detected problems
+- Creates sequential, parallel, or optimized fix plans
+- Validates fix safety and checks prerequisites
+- Generates rollback plans for all fixes
+- Estimates downtime and impact
+- Suggests alternative fixes
+
+4. Utilities (utils/)
+telnet_utils.py
+
+- Manages telnet connections to router console ports
+- Sends commands and retrieves output
+- Handles config mode entry/exit
+- Enables/disables debugging
+- Gets running configurations
+
+reporter.py
+
+- Rich console output with tables and progress bars
+- Saves run history to ~/Capstone_AI/history/runs/
+- Generates health reports and summaries
+- Provides color-coded success/error/warning messages
+
+network_utils.py
+
+- IP address/network parsing and validation
+- Wildcard ↔ netmask conversion
+- Interface name normalization
+- Bandwidth parsing
+- MAC address formatting
+
+5. Main Runner (runner.py)
+DiagnosticRunner class:
+
+- Connects to GNS3 API to discover running routers
+- Scans devices for problems (parallel execution)
+- Reports findings in formatted tables
+- Applies fixes (with user confirmation)
+- Saves configurations and run history
+- Restores from baseline when needed
+
+
+
+
+
+
+
