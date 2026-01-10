@@ -83,6 +83,86 @@ def get_ospf_config(tn):
     except Exception:
         return None
 
+def check_interface_timers(tn, device_name):
+    """
+    Check OSPF hello and dead timers on all interfaces.
+    
+    Args:
+        tn: Telnet connection
+        device_name: Device name
+        
+    Returns:
+        List of timer mismatch issues
+    """
+    issues = []
+    baseline = get_device_baseline(device_name)
+    baseline_interfaces = baseline.get('interfaces', {})
+    process_id = get_ospf_process_id(device_name)
+    
+    for intf_name, intf_info in baseline_interfaces.items():
+        # Skip interfaces without IP addresses
+        if not intf_info.get('ip_address'):
+            continue
+        
+        try:
+            clear_line_and_reset(tn)
+            cmd = f'show ip ospf interface {intf_name}\r\n'
+            tn.write(cmd.encode('ascii'))
+            time.sleep(1)
+            output = tn.read_very_eager().decode('ascii', errors='ignore')
+            
+            # Skip if interface is not in OSPF
+            if 'not found' in output.lower() or 'not enabled' in output.lower():
+                continue
+            
+            # Parse current timer values
+            # Look for patterns like:
+            # "Timer intervals configured, Hello 10, Dead 40"
+            # or "Hello due in 00:00:03"
+            hello_match = re.search(r'Hello\s+(\d+)', output, re.IGNORECASE)
+            dead_match = re.search(r'Dead\s+(\d+)', output, re.IGNORECASE)
+            
+            # Get expected values from baseline
+            expected_hello = intf_info.get('ospf_hello', 10)
+            expected_dead = intf_info.get('ospf_dead', 40)
+            
+            # Track if we found any mismatch
+            has_mismatch = False
+            current_hello = None
+            current_dead = None
+            
+            # Check hello timer
+            if hello_match:
+                current_hello = int(hello_match.group(1))
+                if current_hello != expected_hello:
+                    has_mismatch = True
+            
+            # Check dead timer
+            if dead_match:
+                current_dead = int(dead_match.group(1))
+                if current_dead != expected_dead:
+                    has_mismatch = True
+            
+            # If ANY timer is wrong, report with BOTH values
+            if has_mismatch:
+                issues.append({
+                    'type': 'ospf timer mismatch',
+                    'category': 'ospf',
+                    'interface': intf_name,
+                    'current_hello': current_hello if current_hello else expected_hello,
+                    'current_dead': current_dead if current_dead else expected_dead,
+                    'expected_hello': expected_hello,
+                    'expected_dead': expected_dead,
+                    'process_id': process_id,
+                    'line': f'{intf_name}: Hello {current_hello}s/{expected_hello}s, Dead {current_dead}s/{expected_dead}s'
+                })
+                
+        except Exception as e:
+            print(f"[DEBUG] Error checking OSPF timers on {intf_name}: {e}")
+            continue
+    
+    return issues
+
 def get_ospf_interface_info(tn, interface):
     """Get OSPF interface information"""
     try:
@@ -523,29 +603,43 @@ def parse_ospf_debug(debug_output):
 
 
 def get_ospf_fix_commands(issue_type, issue_details, device_name):
-    """Get fix commands for OSPF issues"""
+    """
+    Get fix commands for OSPF issues.
+    
+    Args:
+        issue_type: Type of issue
+        issue_details: Dict with issue details
+        device_name: Device name
+        
+    Returns:
+        List of commands to fix the issue
+    """
     process_id = get_ospf_process_id(device_name)
     
-    if issue_type in ['hello interval mismatch', 'dead interval mismatch']:
+    # **FIXED: OSPF timer commands**
+    if issue_type in ['hello interval mismatch', 'dead interval mismatch', 'ospf timer mismatch']:
         interface = issue_details.get('interface')
         
-        # Get baseline values for this interface
-        baseline = get_device_baseline(device_name)
-        intf_info = baseline.get('interfaces', {}).get(interface, {})
-        expected_hello = intf_info.get('ospf_hello', 10)
-        expected_dead = intf_info.get('ospf_dead', 40)
+        # Get expected values (what we want to configure)
+        expected_hello = issue_details.get('expected_hello', 10)
+        expected_dead = issue_details.get('expected_dead', 40)
         
         return [
             f"interface {interface}",
             f"ip ospf hello-interval {expected_hello}",
-            f"ip ospf dead-interval {expected_dead}"
+            f"ip ospf dead-interval {expected_dead}",
+            "end"
         ]
     
     elif issue_type == 'passive interface':
         interface = issue_details.get('interface')
         should_be_passive = issue_details.get('should_be_passive', False)
         if not should_be_passive:
-            return [f"router ospf {process_id}", f"no passive-interface {interface}"]
+            return [
+                f"router ospf {process_id}",
+                f"no passive-interface {interface}",
+                "end"
+            ]
     
     elif issue_type == 'process id mismatch':
         expected_process = issue_details.get('expected', process_id)
@@ -561,23 +655,39 @@ def get_ospf_fix_commands(issue_type, issue_details, device_name):
         network = issue_details.get('network')
         wildcard = issue_details.get('wildcard')
         area = issue_details.get('area')
-        return [f"router ospf {process_id}", f"network {network} {wildcard} area {area}"]
+        return [
+            f"router ospf {process_id}",
+            f"network {network} {wildcard} area {area}",
+            "end"
+        ]
     
     elif issue_type == 'extra network':
         network = issue_details.get('network')
         wildcard = issue_details.get('wildcard')
         area = issue_details.get('area')
-        return [f"router ospf {process_id}", f"no network {network} {wildcard} area {area}"]
+        return [
+            f"router ospf {process_id}",
+            f"no network {network} {wildcard} area {area}",
+            "end"
+        ]
     
     elif issue_type in ['stub area', 'unexpected stub area']:
         area = issue_details.get('area')
         should_be_stub = issue_details.get('should_be_stub', False)
         if not should_be_stub:
-            return [f"router ospf {process_id}", f"no area {area} stub"]
-
+            return [
+                f"router ospf {process_id}",
+                f"no area {area} stub",
+                "end"
+            ]
+    
     elif issue_type == 'missing stub area':
         area = issue_details.get('area')
-        return [f"router ospf {process_id}", f"area {area} stub"]
+        return [
+            f"router ospf {process_id}",
+            f"area {area} stub",
+            "end"
+        ]
     
     elif issue_type == 'router id mismatch':
         expected_rid = issue_details.get('expected')
@@ -585,7 +695,8 @@ def get_ospf_fix_commands(issue_type, issue_details, device_name):
             return [
                 f"router ospf {process_id}",
                 f"router-id {expected_rid}",
-                "# May need to clear OSPF process: clear ip ospf process"
+                "end",
+                "# NOTE: May need to clear OSPF process: clear ip ospf process"
             ]
     
     elif issue_type == 'suspicious router id':
@@ -594,6 +705,7 @@ def get_ospf_fix_commands(issue_type, issue_details, device_name):
             return [
                 f"router ospf {process_id}",
                 f"router-id {expected_rid}",
+                "end",
                 "# IMPORTANT: Clear OSPF process after: clear ip ospf process"
             ]
     
@@ -603,11 +715,10 @@ def get_ospf_fix_commands(issue_type, issue_details, device_name):
     elif issue_type == 'area mismatch':
         interface = issue_details.get('interface')
         expected_area = issue_details.get('expected_area', '0')
-        
         return [
             f"interface {interface}",
             f"ip ospf {process_id} area {expected_area}",
-            "# Or fix via network statement under router ospf"
+            "end"
         ]
     
     elif issue_type == 'interface not in ospf':
@@ -615,10 +726,10 @@ def get_ospf_fix_commands(issue_type, issue_details, device_name):
         network = issue_details.get('expected_network')
         wildcard = issue_details.get('expected_wildcard')
         area = issue_details.get('expected_area', '0')
-        
         return [
             f"router ospf {process_id}",
             f"network {network} {wildcard} area {area}",
+            "end",
             f"# Or configure directly: interface {interface} | ip ospf {process_id} area {area}"
         ]
     
@@ -684,62 +795,67 @@ def verify_ospf_neighbors(tn):
 
 
 def troubleshoot_ospf(device_name, tn, auto_prompt=True):
-
+    """
+    Main OSPF troubleshooting function.
+    
+    Args:
+        device_name: Device name
+        tn: Telnet connection
+        auto_prompt: Whether to prompt user for fixes
+        
+    Returns:
+        Tuple of (all_issues, fixed_issues)
+    """
     if not is_ospf_router(device_name):
         return [], []
     
     all_issues = []
-
+    
     # Check process ID
     process_issue = check_process_id_mismatch(tn, device_name)
     if process_issue:
         all_issues.append(process_issue)
-
+    
     # Check passive interfaces
     passive_intfs = check_passive_interfaces(tn, device_name)
     if passive_intfs:
         all_issues.extend(passive_intfs)
-
-    # Check stub configuration
+    
+    # Check stub areas
     stub_issues = check_stub_config(tn, device_name)
     if stub_issues:
         all_issues.extend(stub_issues)
-
-    # MODIFIED: Check network statements (only extra networks now)
+    
+    # Check network statements
     network_issues = check_network_statements(tn, device_name)
     if network_issues:
         all_issues.extend(network_issues)
     
-    # NEW: Check if expected interfaces are actually in OSPF
+    # Check OSPF participation
     ospf_participation_issues = check_ospf_enabled_interfaces(tn, device_name)
     if ospf_participation_issues:
         all_issues.extend(ospf_participation_issues)
-
-    # Check interface timers
+    
+    # **FIXED: Now actually calling the timer check function**
     timer_issues = check_interface_timers(tn, device_name)
     if timer_issues:
         all_issues.extend(timer_issues)
-
-    # Check router ID conflicts
-    rid_issues = check_router_id_conflicts(tn, device_name)
-    if rid_issues:
-        all_issues.extend(rid_issues)
     
     # Check area assignments
     area_issues = check_area_assignments(tn, device_name)
     if area_issues:
         all_issues.extend(area_issues)
-
-    # Check if OSPF neighbors exist
+    
+    # Check for neighbors
     neighbor_output = get_ospf_neighbors(tn)
     if not neighbor_output:
         return all_issues, []
-
+    
     neighbor_lines = [l for l in neighbor_output.split('\n')
                      if l.strip() and 'Neighbor' not in l and 'Address' not in l]
     neighbor_count = len([l for l in neighbor_lines if any(c.isdigit() for c in l)])
-
-    # If no neighbors, use debug to find more issues
+    
+    # If no neighbors and no issues found, enable debug
     if neighbor_count == 0 and not all_issues:
         if enable_ospf_debug(tn):
             debug_output = gather_ospf_debug(tn, wait_time=10)
@@ -747,39 +863,38 @@ def troubleshoot_ospf(device_name, tn, auto_prompt=True):
             if debug_output:
                 debug_issues = parse_ospf_debug(debug_output)
                 all_issues.extend(debug_issues)
-
+    
     if not all_issues:
         return [], []
-
+    
     if not auto_prompt:
         return all_issues, []
-
-    # Interactive fixing
+    
+    # Interactive fix application
     fixed_issues = []
     for issue in all_issues:
         issue_type = issue['type']
         print(f"\nProblem: {device_name} - {issue_type}")
         if 'line' in issue:
             print(f"  Details: {issue['line'][:80]}")
-
+        
         response = input("Apply fixes? (Y/n): ").strip().lower()
         if response == 'n':
             continue
-
-        fix_commands = get_ospf_fix_commands(issue_type, issue, device_name)
         
+        fix_commands = get_ospf_fix_commands(issue_type, issue, device_name)
         if not fix_commands:
             print("Note: Manual intervention required")
             continue
-
+        
         print(f"Commands to apply:")
         for cmd in fix_commands:
             print(f"  {cmd}")
-
+        
         if apply_ospf_fixes(tn, fix_commands):
             print("Fixes applied successfully")
             fixed_issues.append(issue_type)
         else:
             print("Failed to apply fixes")
-
+    
     return all_issues, fixed_issues
