@@ -107,13 +107,23 @@ def get_eigrp_interfaces(tn):
         return None
 
 def check_eigrp_interface_timers(tn, device_name):
-    issues = []
+    """
+    Check EIGRP hello and hold timers on all interfaces.
     
+    Args:
+        tn: Telnet connection
+        device_name: Device name
+        
+    Returns:
+        List of timer mismatch issues
+    """
+    issues = []
     baseline = get_device_baseline(device_name)
     baseline_interfaces = baseline.get('interfaces', {})
     as_number = get_eigrp_as_number(device_name)
     
     for intf_name, intf_info in baseline_interfaces.items():
+        # Skip interfaces without IP addresses (they won't be in EIGRP)
         if not intf_info.get('ip_address'):
             continue
         
@@ -124,40 +134,51 @@ def check_eigrp_interface_timers(tn, device_name):
             time.sleep(1)
             output = tn.read_very_eager().decode('ascii', errors='ignore')
             
+            # Skip if interface is not in EIGRP
             if 'not found' in output.lower() or 'not running' in output.lower():
                 continue
             
+            # Parse current timer values from output
             hello_match = re.search(r'Hello[- ]interval[- ]is\s+(\d+)', output, re.IGNORECASE)
             hold_match = re.search(r'Hold[- ]time[- ]is\s+(\d+)', output, re.IGNORECASE)
             
+            # Get expected values from baseline
             expected_hello = intf_info.get('eigrp_hello', 5)
             expected_hold = intf_info.get('eigrp_hold', 15)
             
+            # Track if we found any mismatch on this interface
+            has_mismatch = False
+            current_hello = None
+            current_hold = None
+            
+            # Check hello timer
             if hello_match:
                 current_hello = int(hello_match.group(1))
                 if current_hello != expected_hello:
-                    issues.append({
-                        'type': 'eigrp hello timer mismatch',
-                        'category': 'eigrp',  # ADD THIS
-                        'interface': intf_name,
-                        'current': current_hello,
-                        'expected': expected_hello,
-                        'line': f'{intf_name}: Hello {current_hello} (expected {expected_hello})'
-                    })
+                    has_mismatch = True
             
+            # Check hold timer
             if hold_match:
                 current_hold = int(hold_match.group(1))
                 if current_hold != expected_hold:
-                    issues.append({
-                        'type': 'eigrp hold timer mismatch',
-                        'category': 'eigrp',  # ADD THIS
-                        'interface': intf_name,
-                        'current': current_hold,
-                        'expected': expected_hold,
-                        'line': f'{intf_name}: Hold {current_hold} (expected {expected_hold})'
-                    })
+                    has_mismatch = True
             
-        except Exception:
+            # If ANY timer is wrong, report the issue with BOTH current values
+            if has_mismatch:
+                issues.append({
+                    'type': 'eigrp timer mismatch',
+                    'category': 'eigrp',
+                    'interface': intf_name,
+                    'current_hello': current_hello if current_hello else expected_hello,
+                    'current_hold': current_hold if current_hold else expected_hold,
+                    'expected_hello': expected_hello,
+                    'expected_hold': expected_hold,
+                    'as_number': as_number,
+                    'line': f'{intf_name}: Hello {current_hello}s/{expected_hello}s, Hold {current_hold}s/{expected_hold}s'
+                })
+                
+        except Exception as e:
+            print(f"[DEBUG] Error checking timers on {intf_name}: {e}")
             continue
     
     return issues
@@ -386,26 +407,52 @@ def check_network_statements(tn, device_name):
 
 
 def get_eigrp_fix_commands(issue_type, issue_details, device_name):
-    """Get fix commands for EIGRP issues"""
+    """
+    Get fix commands for EIGRP issues.
+    
+    Args:
+        issue_type: Type of issue (string)
+        issue_details: Dict with issue details
+        device_name: Device name
+        
+    Returns:
+        List of commands to fix the issue
+    """
     as_number = get_eigrp_as_number(device_name)
     
     if issue_type in ['k-value mismatch', 'non-default k-values']:
         expected_k = issue_details.get('expected', '0 1 0 1 0 0')
-        return [f"router eigrp {as_number}", f"metric weights {expected_k}"]
+        return [
+            f"router eigrp {as_number}",
+            f"metric weights {expected_k}",
+            "end"
+        ]
     
     elif issue_type == 'passive interface':
         interface = issue_details.get('interface')
         should_be_passive = issue_details.get('should_be_passive', False)
         if not should_be_passive:
-            return [f"router eigrp {as_number}", f"no passive-interface {interface}"]
+            return [
+                f"router eigrp {as_number}",
+                f"no passive-interface {interface}",
+                "end"
+            ]
     
     elif issue_type == 'stub configuration':
         should_be_stub = issue_details.get('should_be_stub', False)
         if not should_be_stub:
-            return [f"router eigrp {as_number}", "no eigrp stub"]
+            return [
+                f"router eigrp {as_number}",
+                "no eigrp stub",
+                "end"
+            ]
     
     elif issue_type == 'missing stub configuration':
-        return [f"router eigrp {as_number}", "eigrp stub"]
+        return [
+            f"router eigrp {as_number}",
+            "eigrp stub",
+            "end"
+        ]
     
     elif issue_type == 'as mismatch':
         expected_as = issue_details.get('expected', as_number)
@@ -414,31 +461,41 @@ def get_eigrp_fix_commands(issue_type, issue_details, device_name):
             return [
                 f"no router eigrp {current_as}",
                 f"router eigrp {expected_as}",
-                "# Network statements will need to be re-added manually"
+                "# NOTE: Network statements will need to be re-added"
             ]
     
     elif issue_type == 'missing network':
         network = issue_details.get('network')
-        return [f"router eigrp {as_number}", f"network {network}"]
+        return [
+            f"router eigrp {as_number}",
+            f"network {network}",
+            "end"
+        ]
     
     elif issue_type == 'extra network':
         network = issue_details.get('network')
-        return [f"router eigrp {as_number}", f"no network {network}"]
+        return [
+            f"router eigrp {as_number}",
+            f"no network {network}",
+            "end"
+        ]
     
-    # **NEW: EIGRP timer fixes**
-    elif issue_type in ['eigrp hello timer mismatch', 'eigrp hold timer mismatch']:
+    # **FIXED: EIGRP timer commands**
+    elif issue_type in ['eigrp hello timer mismatch', 'eigrp hold timer mismatch', 'eigrp timer mismatch']:
         interface = issue_details.get('interface')
         
-        # Get both expected values for this interface
-        baseline = get_device_baseline(device_name)
-        intf_info = baseline.get('interfaces', {}).get(interface, {})
-        expected_hello = intf_info.get('eigrp_hello', 5)
-        expected_hold = intf_info.get('eigrp_hold', 15)
+        # Get expected values (these are what we want to configure)
+        expected_hello = issue_details.get('expected_hello', 5)
+        expected_hold = issue_details.get('expected_hold', 15)
+        
+        # Get AS number (might be in issue_details or fetch from baseline)
+        cmd_as_number = issue_details.get('as_number', as_number)
         
         return [
             f"interface {interface}",
-            f"ip hello-interval eigrp {as_number} {expected_hello}",
-            f"ip hold-time eigrp {as_number} {expected_hold}"
+            f"ip hello-interval eigrp {cmd_as_number} {expected_hello}",
+            f"ip hold-time eigrp {cmd_as_number} {expected_hold}",
+            "end"
         ]
     
     return []
