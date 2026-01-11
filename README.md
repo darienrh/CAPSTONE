@@ -6,3 +6,7 @@ Sam, Rayyan, Mersha, Xin, Darien, Rafay
 https://drive.google.com/drive/folders/1iNbugmg0TK6bgDJ0iECrnOcb9gcPbOUQ?usp=drive_link
 ----------------------------------------------------------------------------------------------------------
 
+Integrate FixRecommender into runner.py workflow
+Make inference_engine.diagnose() run after every detection
+Add comprehensive error handling everywhere
+Complete execute_reasoning_chain() implementation
