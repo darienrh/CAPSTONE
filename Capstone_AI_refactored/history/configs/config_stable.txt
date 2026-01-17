@@ -1,0 +1,772 @@
+Stable Configurations Timestamp: 2026-01-15 20:31:08
+================================================================================
+
+STABLE ROUTER CONFIGURATIONS
+================================================================================
+
+DEVICE: R1
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 929 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R1
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.2.1 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.1.1 255.255.255.0
+ duplex half
+!
+interface FastEthernet2/0
+ ip address 192.168.12.1 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ network 192.168.1.0
+ network 192.168.2.0
+ network 192.168.12.0
+ auto-summary
+!
+ip classless
+no ip http server
+!
+!
+no cdp log mismatch duplex
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R1#
+
+DEVICE: R2
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 827 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.2.2 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.3.1 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ network 192.168.2.0
+ network 192.168.3.0
+ auto-summary
+!
+ip classless
+no ip http server
+!
+!
+no cdp log mismatch duplex
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R2#
+
+DEVICE: R3
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 827 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R3
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.3.2 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.4.1 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ network 192.168.3.0
+ network 192.168.4.0
+ auto-summary
+!
+ip classless
+no ip http server
+!
+!
+no cdp log mismatch duplex
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R3#
+
+DEVICE: R4
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 1353 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R4
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+memory-size iomem 5
+no ip icmp rate-limit unreachable
+ip cef
+!
+!
+!
+!
+no ip domain lookup
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+!
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.6.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/0
+ ip address 192.168.8.2 255.255.255.0
+ ip ospf hello-interval 30
+ clock rate 2000000
+!
+interface FastEthernet0/1
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+interface Serial0/1
+ ip address 192.168.9.1 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet1/0
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+router ospf 10
+ router-id 4.4.4.4
+ log-adjacency-changes
+ network 192.168.6.0 0.0.0.255 area 0
+ network 192.168.8.0 0.0.0.255 area 0
+ network 192.168.9.0 0.0.0.255 area 0
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+!
+no cdp log mismatch duplex
+!
+!
+!
+!
+!
+!
+control-plane
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line vty 0 4
+ login
+!
+!
+end
+
+R4#
+
+DEVICE: R5
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 1347 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R5
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+memory-size iomem 5
+no ip icmp rate-limit unreachable
+ip cef
+!
+!
+!
+!
+no ip domain lookup
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+!
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.5.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/0
+ ip address 192.168.8.1 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet0/1
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+interface Serial0/1
+ ip address 192.168.10.1 255.255.255.0
+ ip ospf 10 area 1
+ clock rate 2000000
+!
+interface FastEthernet1/0
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+router ospf 10
+ router-id 1.1.1.1
+ log-adjacency-changes
+ network 192.168.5.0 0.0.0.255 area 0
+ network 192.168.8.0 0.0.0.255 area 0
+ network 192.168.10.0 0.0.0.255 area 0
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+!
+no cdp log mismatch duplex
+!
+!
+!
+!
+!
+!
+control-plane
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line vty 0 4
+ login
+!
+!
+end
+
+R5#
+*Mar  1 00:01:35.219: %OSPF-4-ERRRCV: Received invalid packet: mismatch area ID, from backbone area must be virtual-link but not found from 19
+
+DEVICE: R6
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 1356 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R6
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+memory-size iomem 5
+no ip icmp rate-limit unreachable
+ip cef
+!
+!
+!
+!
+no ip domain lookup
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+!
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.7.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/0
+ ip address 192.168.9.2 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet0/1
+ ip address 192.168.11.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/1
+ ip address 192.168.10.2 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet1/0
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+router ospf 10
+ router-id 1.1.1.1
+ log-adjacency-changes
+ no auto-cost
+ network 192.168.7.0 0.0.0.255 area 0
+ network 192.168.9.0 0.0.0.255 area 0
+ network 192.168.10.0 0.0.0.255 area 0
+!
+ip forward-protocol nd
+!
+!
+no ip http server
+no ip http secure-server
+!
+no cdp log mismatch duplex
+!
+!
+!
+!
+!
+!
+control-plane
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+line vty 0 4
+ login
+!
+!
+end
+
+R6#
+
+DEVICE: R7
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 1203 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R7
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.11.2 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.12.2 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ redistribute ospf 10 metric 1000 1000 255 1 1500 route-map OSPFtoEIGRP
+ network 192.168.12.2 0.0.0.0
+ no auto-summary
+!
+router ospf 10
+ log-adjacency-changes
+ redistribute eigrp 1 subnets route-map EIGRPtoOSPF
+ network 192.168.11.2 0.0.0.0 area 0
+!
+ip classless
+no ip http server
+!
+!
+no cdp log mismatch duplex
+!
+route-map OSPFtoEIGRP deny 5
+ match tag 20
+!
+route-map OSPFtoEIGRP permit 10
+ set tag 10
+!
+route-map EIGRPtoOSPF deny 5
+ match tag 10
+!
+route-map EIGRPtoOSPF permit 10
+ set tag 20
+!
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R7#
