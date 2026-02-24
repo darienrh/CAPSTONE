@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-gui_runner.py - GUI wrapper for runner.py
-Run this file instead of runner.py.
-
-- All text output / questions appear in the GUI window
-- Rich progress bars remain in the terminal
-- runner.py logic is completely untouched
-"""
 
 import tkinter as tk
 from tkinter import scrolledtext
