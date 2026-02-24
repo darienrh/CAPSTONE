@@ -1,23 +1,57 @@
 #!/usr/bin/env python3
 """
-REFACTORED runner.py - Simplified orchestrator using new modular architecture
-Now with GUI Interceptor for prompts!
+GUI wrapper for runner.py - Routes text/questions to a clean Tkinter GUI.
+Progress bars remain in the terminal; dialogs/prompts appear in the GUI window.
 """
 
-import warnings
+import tkinter as tk
+from tkinter import ttk, scrolledtext
+import threading
+import queue
+import sys
 import time
+import warnings
 warnings.filterwarnings('ignore')
 
 import requests
-import sys
-import atexit
-import builtins
-import re
-import gui_helper
-
 from requests.auth import HTTPBasicAuth
+import atexit
 from datetime import datetime
-from rich.prompt import Confirm, Prompt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Patch rich.prompt so it routes through the GUI instead of the terminal
+# Must happen before importing runner modules
+# ─────────────────────────────────────────────────────────────────────────────
+
+_gui_app = None   # set after app is created
+
+class _GUIConfirm:
+    """Replaces rich.prompt.Confirm"""
+    @staticmethod
+    def ask(prompt_text, default=True):
+        if _gui_app:
+            return _gui_app.ask_confirm(prompt_text, default)
+        # fallback
+        ans = input(f"{prompt_text} [y/n]: ").strip().lower()
+        return ans != 'n'
+
+class _GUIPrompt:
+    """Replaces rich.prompt.Prompt"""
+    @staticmethod
+    def ask(prompt_text, choices=None, default=None):
+        if _gui_app:
+            return _gui_app.ask_prompt(prompt_text, choices, default)
+        ans = input(f"{prompt_text}: ").strip()
+        return ans or default
+
+import rich.prompt as _rich_prompt
+_rich_prompt.Confirm = _GUIConfirm
+_rich_prompt.Prompt  = _GUIPrompt
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Now import the actual runner components
+# ─────────────────────────────────────────────────────────────────────────────
+
 from core.config_manager import ConfigManager
 from core.knowledge_base import KnowledgeBase
 from detection.problem_detector import ProblemDetector
@@ -26,616 +60,565 @@ from utils.reporter import Reporter
 from utils.telnet_utils import connect_device, close_device, get_running_config
 
 
-def _clean_text(text):
-    """Strips rich terminal color tags (like [cyan]) for the GUI."""
-    return re.sub(r'\[.*?\]', '', str(text))
+# ─────────────────────────────────────────────────────────────────────────────
+# GUI App
+# ─────────────────────────────────────────────────────────────────────────────
 
-# this should intercept standard input
-def gui_input(prompt_text=""):
-    return gui_helper.ask_string("Input Required", _clean_text(prompt_text))
-builtins.input = gui_input
+DARK_BG     = "#0f1117"
+PANEL_BG    = "#161b22"
+BORDER      = "#30363d"
+ACCENT      = "#58a6ff"
+ACCENT2     = "#3fb950"
+WARN        = "#d29922"
+ERR         = "#f85149"
+TEXT_MAIN   = "#e6edf3"
+TEXT_DIM    = "#8b949e"
+FONT_MONO   = ("JetBrains Mono", 11) if sys.platform != "win32" else ("Consolas", 11)
+FONT_UI     = ("Segoe UI", 11) if sys.platform == "win32" else ("SF Pro Display", 11)
+FONT_TITLE  = ("Segoe UI", 14, "bold") if sys.platform == "win32" else ("SF Pro Display", 14, "bold")
 
-# then intercept rich Confirm.ask()
-def gui_confirm(cls, prompt_text, default=True, **kwargs):
-    return gui_helper.ask_yes_no("Confirmation Required", _clean_text(prompt_text), default=default)
-Confirm.ask = classmethod(gui_confirm)
 
-# Intercept rich Prompt.ask()
-def gui_prompt_ask(cls, prompt_text, choices=None, default=None, **kwargs):
-    if choices:
-        return gui_helper.ask_choice("Select Option", _clean_text(prompt_text), choices, default)
-    return gui_helper.ask_string("Input Required", _clean_text(prompt_text))
-Prompt.ask = classmethod(gui_prompt_ask)
+class DiagnosticGUI:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Network Diagnostic Tool")
+        self.root.configure(bg=DARK_BG)
+        self.root.minsize(820, 600)
+        self.root.geometry("960x700")
 
-class DiagnosticRunner:
-    """
-    Simplified diagnostic runner that orchestrates the modular components
-    """
-    
-    def __init__(self, gns3_url="http://localhost:3080", username="admin", 
-                 password="qrWaprDfbrbUaYw8eMZTRz6cXRfV96PltLIT0gzTIMo7u5vksgVCIjz1iOSIbelS"):
-        self.gns3_url = gns3_url.rstrip('/')
-        self.api_base = f"{self.gns3_url}/v2"
-        self.auth = HTTPBasicAuth(username, password) if username else None
-        
-        self.config_manager = ConfigManager()
-        self.knowledge_base = KnowledgeBase(config_manager=self.config_manager)
-        self.problem_detector = ProblemDetector(self.config_manager)
-        self.reporter = Reporter()
-        self.fix_applier = FixApplier(self.config_manager, self.reporter, self.knowledge_base)
-        
-        self.nodes = {}
-        self.connections = {}
-        self.run_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    def connect(self):
-        """
-        Connect to GNS3 and discover running devices
-        
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            response = requests.get(f"{self.api_base}/version", auth=self.auth, timeout=3)
-            
-            if response.status_code == 401:
-                self.auth = None
-                response = requests.get(f"{self.api_base}/version", timeout=3)
-            
-            if response.status_code != 200:
-                self.reporter.print_error(f"API Error: Status Code {response.status_code}")
-                return False
-            
-            # Get running project and nodes
-            response = requests.get(f"{self.api_base}/projects", auth=self.auth, timeout=5)
-            projects = response.json()
-            
-            for project in projects:
-                if project['status'] == 'opened':
-                    response = requests.get(
-                        f"{self.api_base}/projects/{project['project_id']}/nodes",
-                        auth=self.auth, timeout=5
-                    )
-                    nodes = response.json()
-                    
-                    for node in nodes:
-                        if node['status'] == 'started' and not node['name'].lower().startswith('switch'):
-                            self.nodes[node['name']] = node.get('console')
-                    
-                    if not self.nodes:
-                        self.reporter.print_warning("No running routers found")
-                        return False
-                    
-                    self.reporter.print_success(f"Found {len(self.nodes)} running router(s).")
-                    return True
-            
-            self.reporter.print_error("No open project found.")
-            return False
-        
-        except requests.exceptions.ConnectionError:
-            self.reporter.print_error(f"Could not reach GNS3 at {self.gns3_url}")
-            return False
-        except Exception as e:
-            self.reporter.print_error(f"Connection Error: {str(e)[:100]}")
-            return False
-    
-    def connect_to_devices(self, device_names):
-        """
-        Establish telnet connections to devices
-        
-        Args:
-            device_names: List of device names to connect to
-        
-        Returns:
-            Dict mapping device names to telnet connections
-        """
-        for device_name in device_names:
-            console_port = self.nodes.get(device_name)
-            if not console_port:
-                continue
-            
-            tn = connect_device(console_port)
-            if tn:
-                self.connections[device_name] = tn
-        
-        return self.connections
-    
-    def cleanup_all_connections(self):
-        """Close all telnet connections"""
-        for tn in self.connections.values():
-            close_device(tn)
-        self.connections.clear()
-    
-    def run_diagnostics(self, device_names):
-        """
-        Run diagnostics on specified devices
-        
-        Args:
-            device_names: List of device names
-        
-        Returns:
-            Dict of detected issues
-        """
-        self.reporter.print_phase_header("PHASE 1: DETECTING ISSUES")
-        
-        # Connect to devices if not already connected
-        if not self.connections:
-            self.connect_to_devices(device_names)
-        
-        # Use progress bar
-        with self.reporter.create_progress_bar("Scanning devices...", len(device_names)) as progress:
-            task = progress.add_task("[cyan]Scanning...", total=len(device_names))
-            
-            # Scan all devices in parallel
-            detected_issues = self.problem_detector.scan_all_devices(
-                self.connections,
-                scan_options={
-                    'check_interfaces': True,
-                    'check_eigrp': True,
-                    'check_ospf': True
-                },
-                parallel=True
+        self._answer_queue = queue.Queue()
+        self._build_ui()
+
+        # Wire global reference
+        global _gui_app
+        _gui_app = self
+
+    # ── Build UI ──────────────────────────────────────────────────────────────
+
+    def _build_ui(self):
+        # Header bar
+        hdr = tk.Frame(self.root, bg=PANEL_BG, height=54)
+        hdr.pack(fill="x", side="top")
+        hdr.pack_propagate(False)
+
+        tk.Label(
+            hdr, text="⬡  Network Diagnostic Tool",
+            bg=PANEL_BG, fg=ACCENT, font=FONT_TITLE,
+            padx=20
+        ).pack(side="left", pady=12)
+
+        self.status_dot = tk.Label(hdr, text="●  idle", bg=PANEL_BG, fg=TEXT_DIM, font=FONT_UI)
+        self.status_dot.pack(side="right", padx=20)
+
+        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x")
+
+        # Main area: log + sidebar
+        body = tk.Frame(self.root, bg=DARK_BG)
+        body.pack(fill="both", expand=True, padx=0, pady=0)
+
+        # Log panel
+        log_frame = tk.Frame(body, bg=PANEL_BG, bd=0)
+        log_frame.pack(side="left", fill="both", expand=True, padx=(16, 8), pady=16)
+
+        tk.Label(log_frame, text="OUTPUT LOG", bg=PANEL_BG, fg=TEXT_DIM,
+                 font=("Consolas", 9), padx=8, pady=6).pack(anchor="w")
+
+        self.log = scrolledtext.ScrolledText(
+            log_frame,
+            bg="#0d1117", fg=TEXT_MAIN,
+            font=FONT_MONO,
+            bd=0, relief="flat",
+            insertbackground=ACCENT,
+            selectbackground=ACCENT,
+            wrap="word",
+            padx=10, pady=8,
+            state="disabled"
+        )
+        self.log.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+
+        # Tag colours
+        self.log.tag_config("success",  foreground=ACCENT2)
+        self.log.tag_config("error",    foreground=ERR)
+        self.log.tag_config("warning",  foreground=WARN)
+        self.log.tag_config("info",     foreground=ACCENT)
+        self.log.tag_config("phase",    foreground="#c9d1d9", font=("Consolas", 11, "bold"))
+        self.log.tag_config("dim",      foreground=TEXT_DIM)
+        self.log.tag_config("normal",   foreground=TEXT_MAIN)
+
+        # Right sidebar
+        side = tk.Frame(body, bg=DARK_BG, width=260)
+        side.pack(side="right", fill="y", padx=(0, 16), pady=16)
+        side.pack_propagate(False)
+
+        # Device panel
+        self._build_device_panel(side)
+
+        # Prompt panel (hidden until needed)
+        self.prompt_outer = tk.Frame(side, bg=PANEL_BG, bd=0)
+        self._prompt_label = tk.Label(
+            self.prompt_outer, text="", bg=PANEL_BG, fg=TEXT_MAIN,
+            font=FONT_UI, wraplength=230, justify="left", padx=10, pady=8
+        )
+        self._prompt_label.pack(anchor="w")
+        self._prompt_buttons_frame = tk.Frame(self.prompt_outer, bg=PANEL_BG)
+        self._prompt_buttons_frame.pack(fill="x", padx=8, pady=(0, 10))
+
+        # Footer
+        tk.Frame(self.root, bg=BORDER, height=1).pack(fill="x", side="bottom")
+        footer = tk.Frame(self.root, bg=PANEL_BG, height=36)
+        footer.pack(fill="x", side="bottom")
+        footer.pack_propagate(False)
+
+        self._footer_msg = tk.Label(
+            footer, text="Ready.", bg=PANEL_BG, fg=TEXT_DIM, font=FONT_UI, padx=16
+        )
+        self._footer_msg.pack(side="left", pady=6)
+
+        # Start button
+        self.start_btn = tk.Button(
+            footer,
+            text="▶  Run Diagnostics",
+            bg=ACCENT, fg="#0d1117",
+            font=(FONT_UI[0], 10, "bold"),
+            bd=0, padx=14, pady=4,
+            relief="flat",
+            activebackground="#79c0ff",
+            cursor="hand2",
+            command=self._start_runner
+        )
+        self.start_btn.pack(side="right", padx=14, pady=5)
+
+    def _build_device_panel(self, parent):
+        panel = tk.Frame(parent, bg=PANEL_BG)
+        panel.pack(fill="x", pady=(0, 12))
+
+        tk.Label(panel, text="DEVICES", bg=PANEL_BG, fg=TEXT_DIM,
+                 font=("Consolas", 9), padx=10, pady=6).pack(anchor="w")
+
+        entry_frame = tk.Frame(panel, bg=PANEL_BG)
+        entry_frame.pack(fill="x", padx=10, pady=(0, 8))
+
+        tk.Label(entry_frame, text="Target (blank = all):",
+                 bg=PANEL_BG, fg=TEXT_DIM, font=FONT_UI).pack(anchor="w")
+
+        self.device_entry = tk.Entry(
+            entry_frame,
+            bg="#0d1117", fg=TEXT_MAIN,
+            font=FONT_MONO,
+            bd=0, relief="flat",
+            insertbackground=ACCENT,
+            highlightthickness=1,
+            highlightcolor=ACCENT,
+            highlightbackground=BORDER
+        )
+        self.device_entry.pack(fill="x", ipady=5, pady=(4, 0))
+        self.device_entry.insert(0, "e.g. r1, r2, r4")
+        self.device_entry.bind("<FocusIn>",  self._clear_placeholder)
+        self.device_entry.bind("<FocusOut>", self._restore_placeholder)
+
+        # GNS3 URL
+        tk.Label(entry_frame, text="GNS3 URL:",
+                 bg=PANEL_BG, fg=TEXT_DIM, font=FONT_UI, pady=(6, 0)).pack(anchor="w")
+
+        self.url_entry = tk.Entry(
+            entry_frame,
+            bg="#0d1117", fg=TEXT_MAIN,
+            font=FONT_MONO,
+            bd=0, relief="flat",
+            insertbackground=ACCENT,
+            highlightthickness=1,
+            highlightcolor=ACCENT,
+            highlightbackground=BORDER
+        )
+        self.url_entry.pack(fill="x", ipady=5, pady=(4, 0))
+        self.url_entry.insert(0, "http://localhost:3080")
+
+        # Detected devices list
+        tk.Label(panel, text="CONNECTED", bg=PANEL_BG, fg=TEXT_DIM,
+                 font=("Consolas", 9), padx=10, pady=(10, 2)).pack(anchor="w")
+
+        self.device_listbox = tk.Listbox(
+            panel, bg="#0d1117", fg=ACCENT2,
+            font=FONT_MONO, bd=0,
+            selectbackground=BORDER,
+            highlightthickness=0,
+            height=6
+        )
+        self.device_listbox.pack(fill="x", padx=10, pady=(0, 8))
+
+    # ── Placeholder helpers ───────────────────────────────────────────────────
+
+    def _clear_placeholder(self, event):
+        if self.device_entry.get() == "e.g. r1, r2, r4":
+            self.device_entry.delete(0, "end")
+            self.device_entry.configure(fg=TEXT_MAIN)
+
+    def _restore_placeholder(self, event):
+        if not self.device_entry.get():
+            self.device_entry.insert(0, "e.g. r1, r2, r4")
+            self.device_entry.configure(fg=TEXT_DIM)
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+
+    def log_line(self, text, tag="normal"):
+        def _write():
+            self.log.configure(state="normal")
+            ts = datetime.now().strftime("%H:%M:%S")
+            self.log.insert("end", f"[{ts}]  ", "dim")
+            self.log.insert("end", text + "\n", tag)
+            self.log.see("end")
+            self.log.configure(state="disabled")
+        self.root.after(0, _write)
+
+    def set_status(self, text, colour=TEXT_DIM):
+        self.root.after(0, lambda: self.status_dot.configure(text=f"●  {text}", fg=colour))
+
+    def set_footer(self, text):
+        self.root.after(0, lambda: self._footer_msg.configure(text=text))
+
+    # ── Prompt helpers (blocking, waits for GUI answer) ───────────────────────
+
+    def ask_confirm(self, prompt_text, default=True):
+        """Show a confirm dialog in the sidebar and block until answered."""
+        result = threading.Event()
+        answer_holder = [default]
+
+        def _build(val):
+            answer_holder[0] = val
+            self._hide_prompt()
+            result.set()
+
+        def _show():
+            self._prompt_label.configure(text=prompt_text)
+            for w in self._prompt_buttons_frame.winfo_children():
+                w.destroy()
+
+            yes_btn = tk.Button(
+                self._prompt_buttons_frame,
+                text="Yes", bg=ACCENT2, fg="#0d1117",
+                font=(FONT_UI[0], 10, "bold"),
+                bd=0, padx=12, pady=4, relief="flat",
+                cursor="hand2",
+                command=lambda: _build(True)
             )
-            
-            progress.update(task, completed=len(device_names))
-        
-        return detected_issues
-    
-    def save_stable_configurations(self, device_names):
-        """
-        Save current configurations as stable baseline
-        
-        Args:
-            device_names: List of device names
-        
-        Returns:
-            True if successful
-        """
-        self.reporter.print_phase_header("SAVING STABLE CONFIGURATIONS")
-        
-        device_configs = {}
-        
-        with self.reporter.create_progress_bar("Saving configurations...", len(device_names)) as progress:
-            task = progress.add_task("[cyan]Saving...", total=len(device_names))
-            
-            for device_name in device_names:
-                console_port = self.nodes.get(device_name)
-                if not console_port:
-                    progress.advance(task)
-                    continue
-                
-                tn = self.connections.get(device_name) or connect_device(console_port)
-                if not tn:
-                    progress.advance(task)
-                    continue
-                
-                config = get_running_config(tn)
-                if config:
-                    device_configs[device_name] = config
-                
-                if device_name not in self.connections:
-                    close_device(tn)
-                
-                progress.advance(task)
-        
-        if device_configs:
-            saved_file = self.config_manager.save_baseline(device_configs, tag="stable")
-            if saved_file:
-                self.reporter.print_success(f"✓ Saved {len(device_configs)} stable configuration(s)")
-                return True
-        else:
-            self.reporter.print_warning("No configurations were saved")
-        
-        return False
-    
-    def restore_stable_configurations(self, device_names=None):
-        """
-        Restore configurations from stable baseline asynchronously
-        
-        Args:
-            device_names: List of device names or None for all
-        
-        Returns:
-            True if successful
-        """
-        self.reporter.print_phase_header("RESTORING STABLE CONFIGURATIONS")
-        
-        # Load latest baseline config file content
-        config_files = list(self.config_manager.config_dir.glob("config_stable*.txt"))
-        if not config_files:
-            self.reporter.print_error("No stable configuration file found!")
-            return False
-        
-        config_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-        latest_config = config_files[0]
-        
-        with open(latest_config, 'r') as f:
-            content = f.read()
-        
-        # Parse device configs
-        import re as regex_module
-        devices = regex_module.split(r'DEVICE:\s+(\w+)', content)
-        device_configs = {}
-        
-        for i in range(1, len(devices), 2):
-            device_name = devices[i]
-            device_config = devices[i + 1]
-            device_configs[device_name] = device_config
-        
-        # Determine which devices to restore
-        if device_names is None:
-            devices_to_restore = list(device_configs.keys())
-        else:
-            devices_to_restore = [d for d in device_names if d in device_configs]
-        
-        if not devices_to_restore:
-            self.reporter.print_error("No matching devices found in baseline!")
-            return False
-        
-        self.reporter.print_info(f"Using baseline: {latest_config.name}")
-        self.reporter.print_info(f"Will restore: {', '.join(devices_to_restore)}")
-        
-        if not Confirm.ask(f"Restore {len(devices_to_restore)} device(s)?"):
-            return False
-        
-        # Process configurations asynchronously
-        success_count = 0
-        failed_devices = []
-        
-        # Function to restore a single device
-        def restore_single_device(device_name, config):
-            try:
-                console_port = self.nodes.get(device_name)
-                if not console_port:
-                    return device_name, False, "No console port"
-                
-                tn = self.connections.get(device_name) or connect_device(console_port)
-                if not tn:
-                    return device_name, False, "Connection failed"
-                
-                # Clear line and reset
-                tn.write(b'\x03\r\n')
-                time.sleep(0.1)
-                tn.read_very_eager()
-                tn.write(b'end\r\n')
-                time.sleep(0.1)
-                tn.read_very_eager()
-                
-                # STEP 1: Remove existing routing protocol configurations
-                tn.write(b'configure terminal\r\n')
-                time.sleep(0.2)
-                tn.read_very_eager()
-                
-                # Determine which protocols to clear based on device
-                is_eigrp = device_name.upper() in ['R1', 'R2', 'R3']
-                is_ospf = device_name.upper() in ['R4', 'R5', 'R6']
-                
-                if is_eigrp:
-                    # Remove EIGRP configuration
-                    tn.write(b'no router eigrp 1\r\n')
-                    time.sleep(0.3)
-                    tn.read_very_eager()
-                
-                if is_ospf:
-                    # Remove OSPF configuration
-                    tn.write(b'no router ospf 10\r\n')
-                    time.sleep(0.3)
-                    tn.read_very_eager()
-                
-                # STEP 2: Reset all interface configurations to defaults
-                # Parse interfaces from config
-                import re as regex_module
-                interface_sections = regex_module.findall(
-                    r'interface\s+(\S+)',
-                    config,
-                    regex_module.IGNORECASE
-                )
-                
-                for intf in interface_sections:
-                    # Reset interface to default
-                    tn.write(f'default interface {intf}\r\n'.encode('ascii'))
-                    time.sleep(0.2)
-                    tn.read_very_eager()
-                
-                tn.write(b'end\r\n')
-                time.sleep(0.2)
-                tn.read_very_eager()
-                
-                # STEP 3: Parse interface shutdown states from stable config BEFORE applying
-                # This ensures we know the exact desired state for each interface
-                interface_states = {}  # {interface_name: should_be_shutdown}
-                current_interface = None
-                
-                for line in config.split('\n'):
-                    line = line.strip()
-                    if not line or line.startswith('!') or line.startswith('Building') or line.startswith('Current'):
-                        continue
-                    
-                    if line.lower().startswith('interface '):
-                        current_interface = line.split()[1] if len(line.split()) > 1 else None
-                        if current_interface:
-                            # Default: interface should be up (no shutdown)
-                            interface_states[current_interface] = False
-                    
-                    elif current_interface and line.lower() == 'shutdown':
-                        # Mark this interface as should be shutdown
-                        interface_states[current_interface] = True
-                    
-                    elif line.lower().startswith(('router ', 'ip classless', 'line ', 'end', '!')):
-                        # Exited interface context
-                        current_interface = None
-                
-                # STEP 4: Apply baseline configuration (without shutdown commands)
-                tn.write(b'configure terminal\r\n')
-                time.sleep(0.2)
-                tn.read_very_eager()
-                
-                for line in config.split('\n'):
-                    line = line.strip()
-                    
-                    # Skip empty lines, comments, and banner lines
-                    if not line or line.startswith('!') or line.startswith('Building') or line.startswith('Current'):
-                        continue
-                    
-                    # Skip problematic lines that should not be changed
-                    skip_keywords = ['version', 'hostname', 'service ', 'enable ', 'line ', 'boot-']
-                    if any(skip in line.lower() for skip in skip_keywords):
-                        continue
-                    
-                    # Skip shutdown commands - we'll apply them separately at the end
-                    if line.lower() == 'shutdown':
-                        continue
-                    
-                    # Apply the command
-                    tn.write(line.encode('ascii') + b'\r\n')
-                    time.sleep(0.05)
-                    tn.read_very_eager()
-                
-                # STEP 5: Explicitly set shutdown state for each interface based on stable config
-                # First, ensure we're in config mode
-                tn.write(b'end\r\n')
-                time.sleep(0.2)
-                tn.read_very_eager()
-                
-                tn.write(b'configure terminal\r\n')
-                time.sleep(0.2)
-                tn.read_very_eager()
-                
-                # Now apply interface states
-                for intf, should_shutdown in interface_states.items():
-                    tn.write(f'interface {intf}\r\n'.encode('ascii'))
-                    time.sleep(0.1)
-                    tn.read_very_eager()
-                    
-                    if should_shutdown:
-                        tn.write(b'shutdown\r\n')
-                    else:
-                        tn.write(b'no shutdown\r\n')
-                    
-                    time.sleep(0.1)
-                    tn.read_very_eager()
-                
-                # STEP 6: Save configuration
-                tn.write(b'end\r\n')
-                time.sleep(0.3)
-                tn.read_very_eager()
-                
-                tn.write(b'write memory\r\n')
-                time.sleep(1)
-                tn.read_very_eager()
-                
-                # Disconnect if not in main connections dict
-                if device_name not in self.connections:
-                    close_device(tn)
-                
-                return device_name, True, "Success"
-                
-            except Exception as e:
-                # Close connection on error
-                try:
-                    if 'tn' in locals():
-                        close_device(tn)
-                except Exception:
-                    pass
-                return device_name, False, str(e)
-        
-        # Process devices asynchronously
-        import concurrent.futures
-        from concurrent.futures import ThreadPoolExecutor
-        
-        self.reporter.print_info(f"Starting parallel restore of {len(devices_to_restore)} devices...")
-        
-        # Create progress bar
-        with self.reporter.create_progress_bar("Restoring...", len(devices_to_restore)) as progress:
-            task = progress.add_task("[cyan]Restoring...", total=len(devices_to_restore))
-            
-            # Use ThreadPoolExecutor for parallel execution
-            max_workers = min(8, len(devices_to_restore))  # Limit concurrent connections
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                # Submit all restoration tasks
-                future_to_device = {}
-                for device_name in devices_to_restore:
-                    config = device_configs.get(device_name, '')
-                    future = executor.submit(restore_single_device, device_name, config)
-                    future_to_device[future] = device_name
-                
-                # Process results as they complete
-                for future in concurrent.futures.as_completed(future_to_device):
-                    device_name = future_to_device[future]
-                    try:
-                        device, success, message = future.result(timeout=30)
-                        
-                        if success:
-                            progress.update(task, advance=1, 
-                                        description=f"[green]✓ {device_name}")
-                            success_count += 1
-                        else:
-                            progress.update(task, advance=1,
-                                        description=f"[red]✗ {device_name}")
-                            failed_devices.append((device_name, message))
-                            
-                    except concurrent.futures.TimeoutError:
-                        progress.update(task, advance=1,
-                                    description=f"[red]⏰ {device_name} (timeout)")
-                        failed_devices.append((device_name, "Timeout"))
-                    except Exception as e:
-                        progress.update(task, advance=1,
-                                    description=f"[red]✗ {device_name} (error)")
-                        failed_devices.append((device_name, str(e)))
-        
-        # Report results
-        if success_count == len(devices_to_restore):
-            self.reporter.print_success(f"✓ All {success_count} devices restored successfully!")
-        elif success_count > 0:
-            self.reporter.print_warning(f"✓ {success_count}/{len(devices_to_restore)} devices restored")
-            if failed_devices:
-                self.reporter.print_error("Failed devices:")
-                for device, error in failed_devices:
-                    self.reporter.print_error(f"  {device}: {error[:100]}")
-        else:
-            self.reporter.print_error("✗ No devices were restored successfully")
-        
-        return success_count > 0
-    
-    def apply_fixes(self, detected_issues):
-        """
-        Apply fixes for detected issues
-        
-        Args:
-            detected_issues: Dict of detected issues
-        """
-        self.reporter.print_phase_header("PHASE 2: APPLYING FIXES")
-        
-        # Ask for fix mode
-        fix_mode = Prompt.ask(
-            "\n[cyan]Apply fixes:[/cyan]",
-            choices=["all", "one-by-one"],
-            default="one-by-one"
-        )
-        
-        auto_approve_all = (fix_mode == "all")
-        
-        # Apply fixes using FixApplier
-        fix_results = self.fix_applier.apply_all_fixes(
-            detected_issues,
-            self.connections,
-            auto_approve_all
-        )
-        
-        return fix_results
-    
-    def print_completion_summary(self):
-        fix_results = self.fix_applier.get_fix_results()
-        self.reporter.print_fix_completion_summary(fix_results)
-        self.reporter.save_run_history(fix_results, self.run_timestamp)
-        
-        # Enhanced learning: Log detailed problem-solution pairs
-        for result in fix_results:
-            problem = result.get('problem', {})
-            problem['device'] = result['device']
-            
-            solution = {
-                'commands': result['commands'],
-                'verification': result['verification'],
-                'rule_id': problem.get('rule_id') if 'rule_id' in problem else None
-            }
-            
-            success = result.get('success', True)
-            self.knowledge_base.add_problem_solution_pair(problem, solution, success=success)
-            
-            if success:
-                print(f"[Learning] Logged successful fix for {problem.get('type', 'unknown')} on {result['device']}")
-            else:
-                print(f"[Learning] Logged failed fix for {problem.get('type', 'unknown')} on {result['device']}")
-    
-    def show_kb_statistics(self):
-        self.reporter.print_phase_header("KNOWLEDGE BASE STATISTICS")
-        self.knowledge_base.print_statistics()
+            yes_btn.pack(side="left", padx=(0, 6))
 
+            no_btn = tk.Button(
+                self._prompt_buttons_frame,
+                text="No", bg=BORDER, fg=TEXT_MAIN,
+                font=(FONT_UI[0], 10),
+                bd=0, padx=12, pady=4, relief="flat",
+                cursor="hand2",
+                command=lambda: _build(False)
+            )
+            no_btn.pack(side="left")
+
+            self.prompt_outer.pack(fill="x", pady=(0, 12))
+            self.root.update_idletasks()
+
+        self.root.after(0, _show)
+        result.wait()
+        return answer_holder[0]
+
+    def ask_prompt(self, prompt_text, choices=None, default=None):
+        """Show a choice prompt in the sidebar and block until answered."""
+        result = threading.Event()
+        answer_holder = [default]
+
+        def _build(val):
+            answer_holder[0] = val
+            self._hide_prompt()
+            result.set()
+
+        def _show():
+            self._prompt_label.configure(text=prompt_text)
+            for w in self._prompt_buttons_frame.winfo_children():
+                w.destroy()
+
+            if choices:
+                for choice in choices:
+                    style = {
+                        "bg": ACCENT if choice == default else BORDER,
+                        "fg": "#0d1117" if choice == default else TEXT_MAIN
+                    }
+                    btn = tk.Button(
+                        self._prompt_buttons_frame,
+                        text=choice, **style,
+                        font=(FONT_UI[0], 10),
+                        bd=0, padx=12, pady=4, relief="flat",
+                        cursor="hand2",
+                        command=lambda c=choice: _build(c)
+                    )
+                    btn.pack(side="left", padx=(0, 6))
+            else:
+                # text entry fallback
+                entry = tk.Entry(
+                    self._prompt_buttons_frame,
+                    bg="#0d1117", fg=TEXT_MAIN,
+                    font=FONT_MONO, bd=0,
+                    highlightthickness=1,
+                    highlightcolor=ACCENT,
+                    highlightbackground=BORDER
+                )
+                entry.pack(side="left", fill="x", expand=True, ipady=4)
+                if default:
+                    entry.insert(0, default)
+
+                ok_btn = tk.Button(
+                    self._prompt_buttons_frame,
+                    text="OK", bg=ACCENT, fg="#0d1117",
+                    font=(FONT_UI[0], 10, "bold"),
+                    bd=0, padx=10, pady=4, relief="flat",
+                    cursor="hand2",
+                    command=lambda: _build(entry.get() or default)
+                )
+                ok_btn.pack(side="left", padx=(6, 0))
+
+            self.prompt_outer.pack(fill="x", pady=(0, 12))
+            self.root.update_idletasks()
+
+        self.root.after(0, _show)
+        result.wait()
+        return answer_holder[0]
+
+    def ask_device_input(self, prompt_text):
+        """Ask for free-text device input via a GUI dialog."""
+        result = threading.Event()
+        answer_holder = [""]
+
+        def _build():
+            val = entry.get().strip()
+            answer_holder[0] = val
+            self._hide_prompt()
+            result.set()
+
+        def _show():
+            self._prompt_label.configure(text=prompt_text)
+            for w in self._prompt_buttons_frame.winfo_children():
+                w.destroy()
+
+            entry = tk.Entry(
+                self._prompt_buttons_frame,
+                bg="#0d1117", fg=TEXT_MAIN,
+                font=FONT_MONO, bd=0,
+                highlightthickness=1,
+                highlightcolor=ACCENT,
+                highlightbackground=BORDER
+            )
+            entry.pack(side="left", fill="x", expand=True, ipady=4)
+            entry.bind("<Return>", lambda e: _build())
+
+            ok_btn = tk.Button(
+                self._prompt_buttons_frame,
+                text="OK", bg=ACCENT, fg="#0d1117",
+                font=(FONT_UI[0], 10, "bold"),
+                bd=0, padx=10, pady=4, relief="flat",
+                cursor="hand2",
+                command=_build
+            )
+            ok_btn.pack(side="left", padx=(6, 0))
+
+            self.prompt_outer.pack(fill="x", pady=(0, 12))
+            self.root.update_idletasks()
+
+        self.root.after(0, _show)
+        result.wait()
+        return answer_holder[0]
+
+    def _hide_prompt(self):
+        self.prompt_outer.pack_forget()
+
+    # ── Populate device list ──────────────────────────────────────────────────
+
+    def populate_devices(self, device_names):
+        def _fill():
+            self.device_listbox.delete(0, "end")
+            for name in device_names:
+                self.device_listbox.insert("end", f"  {name}")
+        self.root.after(0, _fill)
+
+    # ── Start runner ──────────────────────────────────────────────────────────
+
+    def _start_runner(self):
+        self.start_btn.configure(state="disabled", text="Running…")
+        self.set_status("running", ACCENT)
+        t = threading.Thread(target=self._run_logic, daemon=True)
+        t.start()
+
+    def _run_logic(self):
+        try:
+            self._run_diagnostic_flow()
+        except Exception as exc:
+            self.log_line(f"Unexpected error: {exc}", "error")
+            self.set_status("error", ERR)
+        finally:
+            self.root.after(0, lambda: self.start_btn.configure(
+                state="normal", text="▶  Run Diagnostics"
+            ))
+            self.set_status("idle", TEXT_DIM)
+            self.set_footer("Done.")
+
+    # ── Core diagnostic flow (mirrors main() from runner.py) ─────────────────
+
+    def _run_diagnostic_flow(self):
+        gns3_url = self.url_entry.get().strip() or "http://localhost:3080"
+
+        # Build runner
+        from runner import DiagnosticRunner   # import here to use patched prompts
+        runner = DiagnosticRunner(gns3_url=gns3_url)
+        atexit.register(runner.cleanup_all_connections)
+
+        # Redirect reporter output to GUI
+        self._patch_reporter(runner.reporter)
+
+        self.log_line("Network Diagnostic Tool", "phase")
+
+        stats = runner.knowledge_base.get_statistics()
+        self.log_line(
+            f"KB: {stats['total_rules']} rules | "
+            f"{stats['total_problems_logged']} problems | "
+            f"{stats['overall_success_rate']}% success",
+            "info"
+        )
+
+        self.set_status("connecting…", WARN)
+        self.set_footer("Connecting to GNS3…")
+
+        if not runner.connect():
+            self.log_line("Could not connect to GNS3.", "error")
+            self.set_status("disconnected", ERR)
+            return
+
+        available_devices = [n for n in runner.nodes.keys()
+                             if not n.lower().startswith('switch')]
+        device_map = {n.lower(): n for n in available_devices}
+
+        self.populate_devices(available_devices)
+        self.log_line(f"Available: {', '.join(available_devices)}", "info")
+
+        # Device selection – use the sidebar entry field value
+        raw_input = self.device_entry.get().strip()
+        if raw_input == "e.g. r1, r2, r4":
+            raw_input = ""
+
+        if not raw_input:
+            final_target_list = available_devices
+        else:
+            final_target_list = []
+            for req in [d.strip().lower() for d in raw_input.split(',')]:
+                if req in device_map:
+                    final_target_list.append(device_map[req])
+
+        if not final_target_list:
+            self.log_line("No valid devices selected.", "error")
+            return
+
+        self.log_line(f"Targeting: {', '.join(final_target_list)}", "info")
+        self.set_status("scanning", WARN)
+        self.set_footer("Running diagnostics…")
+
+        detected_issues = runner.run_diagnostics(final_target_list)
+        has_issues = runner.reporter.print_scan_summary(detected_issues)
+
+        if has_issues:
+            proceed = self.ask_confirm("Issues detected. Proceed to fix menu?", default=True)
+            if proceed:
+                runner.apply_fixes(detected_issues)
+                runner.print_completion_summary()
+        else:
+            runner.reporter.save_run_history([], runner.run_timestamp)
+
+        self.log_line("─" * 50, "dim")
+
+        if self.ask_confirm("View Knowledge Base statistics?", default=False):
+            runner.show_kb_statistics()
+
+        self.log_line("─" * 50, "dim")
+
+        if self.ask_confirm("Revert configs to last stable version?", default=False):
+            revert_mode = self.ask_prompt(
+                "Revert mode:",
+                choices=["all", "select"],
+                default="all"
+            )
+            if revert_mode == "all":
+                runner.restore_stable_configurations(final_target_list)
+            else:
+                device_input = self.ask_device_input("Enter devices to revert (e.g. R1, R2):")
+                if device_input:
+                    dmap = {n.lower(): n for n in final_target_list}
+                    revert_devices = []
+                    for req in [d.strip().lower() for d in device_input.split(',')]:
+                        if req in dmap:
+                            revert_devices.append(dmap[req])
+                    if revert_devices:
+                        runner.restore_stable_configurations(revert_devices)
+
+        self.log_line("─" * 50, "dim")
+
+        if self.ask_confirm("Save stable configurations of all routers now?", default=False):
+            runner.save_stable_configurations(final_target_list)
+
+        self.log_line("Script completed successfully!", "success")
+        self.set_status("done", ACCENT2)
+
+    # ── Patch reporter to write to GUI log ────────────────────────────────────
+
+    def _patch_reporter(self, reporter):
+        gui = self
+
+        def _print_success(msg):
+            gui.log_line(msg, "success")
+
+        def _print_error(msg):
+            gui.log_line(msg, "error")
+
+        def _print_warning(msg):
+            gui.log_line(msg, "warning")
+
+        def _print_info(msg):
+            gui.log_line(msg, "info")
+
+        def _print_phase_header(msg):
+            gui.log_line(f"\n{'━'*40}", "dim")
+            gui.log_line(f"  {msg}", "phase")
+            gui.log_line(f"{'━'*40}", "dim")
+            gui.set_status(msg.lower(), ACCENT)
+            gui.set_footer(msg)
+
+        def _print_scan_summary(issues):
+            if not issues:
+                gui.log_line("No issues detected.", "success")
+                return False
+            total = sum(len(v) for v in issues.values())
+            gui.log_line(f"Scan complete: {total} issue(s) across {len(issues)} device(s).", "warning")
+            for device, device_issues in issues.items():
+                for issue in device_issues:
+                    gui.log_line(f"  [{device}] {issue.get('description', issue)}", "warning")
+            return bool(issues)
+
+        reporter.print_success      = _print_success
+        reporter.print_error        = _print_error
+        reporter.print_warning      = _print_warning
+        reporter.print_info         = _print_info
+        reporter.print_phase_header = _print_phase_header
+        reporter.print_scan_summary = _print_scan_summary
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Entry point
+# ─────────────────────────────────────────────────────────────────────────────
 
 def main():
-    runner = DiagnosticRunner()
-    atexit.register(runner.cleanup_all_connections)
-    
-    runner.reporter.print_info("Network Diagnostic Tool")
-    
-    stats = runner.knowledge_base.get_statistics()
-    runner.reporter.print_info(
-        f"Knowledge Base: {stats['total_rules']} rules, "
-        f"{stats['total_problems_logged']} problems logged, "
-        f"{stats['overall_success_rate']}% success rate"
-    )
-    
-    if not runner.connect():
-        sys.exit(1)
-    
-    available_devices = [name for name in runner.nodes.keys() 
-                        if not name.lower().startswith('switch')]
-    device_map = {name.lower(): name for name in available_devices}
-    
-    runner.reporter.print_info(f"\nAvailable: {', '.join(available_devices)}")
-    user_input = input("Enter devices (e.g. 'r1, r2') or Press Enter for all: ").strip()
-    
-    final_target_list = []
-    if not user_input:
-        final_target_list = available_devices
-    else:
-        for req in [d.strip().lower() for d in user_input.split(',')]:
-            if req in device_map:
-                final_target_list.append(device_map[req])
-    
-    if not final_target_list:
-        runner.reporter.print_error("No valid devices selected. Exiting.")
-        sys.exit(1)
-    
-    detected_issues = runner.run_diagnostics(final_target_list)
-    has_issues = runner.reporter.print_scan_summary(detected_issues)
-    
-    if has_issues and Confirm.ask("\nProceed to fix menu?"):
-        runner.apply_fixes(detected_issues)
-        runner.print_completion_summary()
-    else:
-        if not has_issues:
-            runner.reporter.save_run_history([], runner.run_timestamp)
-    
-    print("\n" + "=" * 60)
-    
-    if Confirm.ask("View Knowledge Base statistics?", default=False):
-        runner.show_kb_statistics()
-    
-    print("\n" + "=" * 60)
-    
-    if Confirm.ask("Revert configs to last stable version?", default=False):
-        revert_mode = Prompt.ask(
-            "[cyan]Revert:[/cyan]",
-            choices=["all", "select"],
-            default="all"
-        )
-        
-        if revert_mode == "all":
-            runner.restore_stable_configurations(final_target_list)
-        else:
-            device_input = input("Enter devices to revert (e.g. 'R1, R2, R4'): ").strip()
-            if device_input:
-                device_map = {name.lower(): name for name in final_target_list}
-                revert_devices = []
-                for req in [d.strip().lower() for d in device_input.split(',')]:
-                    if req in device_map:
-                        revert_devices.append(device_map[req])
-                
-                if revert_devices:
-                    runner.restore_stable_configurations(revert_devices)
-    
-    print("\n" + "=" * 60)
-    if Confirm.ask("Save stable configurations of all routers now?"):
-        runner.save_stable_configurations(final_target_list)
-    
-    runner.reporter.print_success("\nScript completed successfully!")
+    root = tk.Tk()
+    root.resizable(True, True)
+    app = DiagnosticGUI(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n[bold red]Interrupted[/bold red]")
+        print("\nInterrupted")
         sys.exit(0)
