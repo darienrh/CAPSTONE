@@ -15,18 +15,11 @@ import sys
 import builtins
 import warnings
 warnings.filterwarnings('ignore')
-
 from datetime import datetime
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Global GUI reference  (set once app is created, before runner import)
-# ─────────────────────────────────────────────────────────────────────────────
 _app = None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Patch builtins.input → routes to GUI
-# ─────────────────────────────────────────────────────────────────────────────
+#gui inputs fix
 _real_input = builtins.input
 
 def _gui_input(prompt=""):
@@ -37,9 +30,7 @@ def _gui_input(prompt=""):
 builtins.input = _gui_input
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Patch rich.prompt before runner.py is imported
-# ─────────────────────────────────────────────────────────────────────────────
+#run rich prompt before gui so it works
 import rich.prompt as _rp
 
 class _GUIConfirm:
@@ -61,9 +52,7 @@ _rp.Confirm = _GUIConfirm
 _rp.Prompt  = _GUIPrompt
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Patch builtins.print → mirror to GUI log
-# ─────────────────────────────────────────────────────────────────────────────
+#path the prints to gui logs
 _real_print = builtins.print
 
 def _gui_print(*args, **kwargs):
@@ -75,16 +64,14 @@ def _gui_print(*args, **kwargs):
 builtins.print = _gui_print
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Now safe to import runner internals
-# ─────────────────────────────────────────────────────────────────────────────
+#this makes it safe to run the runner
 from utils.reporter import Reporter
 import runner as _runner_module
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
 # Colours & fonts
-# ─────────────────────────────────────────────────────────────────────────────
+
 BG       = "#0d1117"
 PANEL    = "#161b22"
 BORDER   = "#30363d"
@@ -100,9 +87,7 @@ UI    = ("Segoe UI", 10)    if sys.platform == "win32" else ("Helvetica Neue", 1
 TITLE = ("Segoe UI", 13, "bold") if sys.platform == "win32" else ("Helvetica Neue", 13, "bold")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Main GUI class
-# ─────────────────────────────────────────────────────────────────────────────
 class App:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -120,7 +105,7 @@ class App:
         global _app
         _app = self
 
-    # ── UI Construction ───────────────────────────────────────────────────────
+    # UI Construction
 
     def _build_ui(self):
         # Top bar
@@ -263,7 +248,7 @@ class App:
         )
         self.dev_list.pack(fill="x", padx=10, pady=(0, 8))
 
-    # ── Logging ───────────────────────────────────────────────────────────────
+    # Logging 
 
     def log_line(self, text, tag="normal"):
         import re
@@ -291,7 +276,7 @@ class App:
                 self.dev_list.insert("end", f"  {n}")
         self.root.after(0, _f)
 
-    # ── Prompt helpers ────────────────────────────────────────────────────────
+    #Prompt helpers
 
     def _show_prompt(self, label_text, build_buttons_fn):
         def _f():
@@ -383,7 +368,7 @@ class App:
         self._answer_event.wait()
         return self._answer_value or ""
 
-    # ── Reporter patch ────────────────────────────────────────────────────────
+    #Reporter patch
 
     def _patch_reporter(self):
         gui = self
@@ -439,7 +424,7 @@ class App:
 
         Reporter.print_fix_completion_summary = _fix_summary
 
-    # ── Run ───────────────────────────────────────────────────────────────────
+    #Run
 
     def _start(self):
         self._run_btn.configure(state="disabled", text="Running…")
@@ -556,9 +541,8 @@ class App:
         self.log_line("Script completed successfully!", "success")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Entry point
-# ─────────────────────────────────────────────────────────────────────────────
+# Entry point into runner
+
 def main():
     root = tk.Tk()
     root.resizable(True, True)
