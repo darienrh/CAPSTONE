@@ -1,9 +1,6 @@
 Changed GUI from a runner clone to a web UI, now it uses the runner.py file directly and opens at (http://localhost:5000/)  
 
-# please make improve GUI from here  
-
-![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/current_gui.png)
-
+# please improve GUI from here  
 
 # To Do:  
 - improve design and styles   
@@ -25,4 +22,8 @@ python3 app.py
 1. inside VM at http://localhost:5000  
 2. Or view on PC at http://<vm's ip>:5000  
 
-
+# Pictures: 
+- i added light/dark toggle bar
+![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui_03_29.png)
+![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui2_03_29.png)
+![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui3_03_29.png)
