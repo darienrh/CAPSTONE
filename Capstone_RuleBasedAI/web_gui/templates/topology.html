@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topology — Network Diagnostic Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='topology.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/vis-network.min.css">
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <div class="d-flex align-items-center gap-3">
+                <a class="navbar-brand" href="/">
+                    <i class="bi bi-router"></i> Network Diagnostic Tool
+                </a>
+                <span class="nav-page-divider">|</span>
+                <span class="nav-page-label"><i class="bi bi-diagram-3"></i> Topology</span>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <a href="/" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-terminal"></i> Diagnostics
+                </a>
+                <button id="theme-toggle" title="Toggle theme" onclick="toggleTheme()">
+                    <i class="bi bi-sun-fill" id="theme-icon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toolbar -->
+    <div class="topo-toolbar">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <label class="topo-toolbar-label">GNS3 URL</label>
+            <input type="text" id="topo-gns3-url" class="form-control form-control-sm topo-url-input"
+                value="http://localhost:3080">
+            <button class="btn btn-primary btn-sm" onclick="loadTopology()">
+                <i class="bi bi-plug-fill"></i> Connect
+            </button>
+            <button id="btn-refresh" class="btn btn-sm btn-outline-secondary" onclick="refreshTopology()" disabled>
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            <input type="text" id="topo-username" class="form-control form-control-sm topo-url-input"
+                placeholder="username (optional)" style="width:140px;">
+            <input type="password" id="topo-password" class="form-control form-control-sm topo-url-input"
+                placeholder="password (optional)" style="width:140px;">
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="topo-toolbar-label">Auto-refresh</label>
+            <select id="poll-interval" class="form-select form-select-sm topo-poll-select" onchange="updatePolling()">
+                <option value="0">Off</option>
+                <option value="10">10s</option>
+                <option value="30" selected>30s</option>
+                <option value="60">60s</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Status bar -->
+    <div id="topo-status" class="topo-status-bar topo-status-loading">
+        Not connected — click Connect to load topology
+    </div>
+
+    <!-- Main workspace -->
+    <div class="topo-workspace">
+
+        <!-- Canvas -->
+        <div id="topology-canvas" class="topo-canvas"></div>
+
+        <!-- Legend -->
+        <div class="topo-legend">
+            <div class="legend-item"><span class="legend-dot" style="background:#2ea043;border-color:#2ea043"></span>
+                Started</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#da3633;border-color:#da3633"></span>
+                Stopped</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#bb8009;border-color:#bb8009"></span>
+                Suspended</div>
+            <div class="legend-item"><span class="legend-dot" style="background:#7d8590;border-color:#7d8590"></span>
+                Unknown</div>
+        </div>
+
+        <!-- Empty state -->
+        <div id="topo-empty" class="topo-empty-state">
+            <i class="bi bi-diagram-3" style="font-size:3rem;color:var(--text-muted);"></i>
+            <div
+                style="margin-top:12px;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;font-size:0.85rem;">
+                Enter your GNS3 URL and click Connect
+            </div>
+        </div>
+
+        <!-- Node detail panel -->
+        <div id="detail-panel" class="topo-detail-panel" style="display:none;">
+            <div class="detail-panel-header">
+                <span class="detail-panel-title" id="detail-title">Node</span>
+                <div class="d-flex gap-2">
+                    <button class="detail-refresh-btn" onclick="loadNodeDetail(selectedNodeName, 'started')"
+                        title="Refresh">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                    <button class="detail-close-btn" onclick="closePanel()" title="Close">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="detail-panel-body" id="detail-body"></div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.9/vis-network.min.js"></script>
+    <script src="{{ url_for('static', filename='topology.js') }}"></script>
+</body>
+
+</html>

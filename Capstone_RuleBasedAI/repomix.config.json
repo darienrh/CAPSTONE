@@ -1,0 +1,28 @@
+{
+    "output": {
+        "style": "xml",
+        "filePath": "repomix-output.xml",
+        "removeComments": true,
+        "removeEmptyLines": true
+    },
+    "ignore": {
+        "customPatterns": [
+            "__pycache__/",
+            "*.pyc",
+            "*.pyo",
+            "*.so",
+            "*.pyd",
+            "*.dll",
+            ".venv/",
+            "venv/",
+            "env/",
+            ".vscode/",
+            "problem2.py",
+            "*.txt",
+            "history/",
+            ".gitignore",
+            "**/__init__.py",
+            "utils/"
+        ]
+    }
+}
