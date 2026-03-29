@@ -9,6 +9,12 @@ Changed GUI from a runner clone to a web UI, now it uses the runner.py file dire
 - change discovered routers text to different color (need to select them to see router numbers)
 - add more pages for things like network statistics, topology view, etc
 
+# Run it:
+user1@ubuntu:~/Capstone_AI/web_gui$ python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 app.py
+
 
  
 
