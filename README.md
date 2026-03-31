@@ -24,5 +24,6 @@ python3 app.py
 # Pictures: 
 - i added light/dark toggle bar
 - fixed topology page, now the topology is a link where you can view and manage the topology in web. 
-![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui_03_29.png)
+![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui-03-31-01.png)
+![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui-03-31-02.png)
 ![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/top1.png)
