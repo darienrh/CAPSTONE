@@ -1,0 +1,352 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700&display=swap');
+
+/* ============================================
+   NAVBAR EXTRAS (topology-specific)
+   ============================================ */
+
+.nav-page-divider {
+    color: var(--border-hover);
+    font-size: 1rem;
+}
+
+.nav-page-label {
+    color: var(--accent);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* ============================================
+   TOOLBAR
+   ============================================ */
+
+.topo-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.topo-toolbar-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    margin: 0;
+}
+
+.topo-url-input {
+    width: 220px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+}
+
+.topo-poll-select {
+    width: 90px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+}
+
+/* ============================================
+   STATUS BAR
+   ============================================ */
+
+.topo-status-bar {
+    padding: 5px 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    transition: background 0.3s, color 0.3s;
+}
+
+.topo-status-ok      { background: var(--success-soft); color: var(--success); }
+.topo-status-error   { background: var(--danger-soft);  color: var(--danger); }
+.topo-status-loading { background: var(--bg-tertiary);  color: var(--text-secondary); }
+
+/* ============================================
+   WORKSPACE
+   ============================================ */
+
+.topo-workspace {
+    position: relative;
+    height: calc(100vh - 120px);
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+/* ============================================
+   CANVAS
+   ============================================ */
+
+#topology-canvas {
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary);
+    transition: background 0.3s;
+}
+
+/* vis.js internal border fix */
+#topology-canvas canvas {
+    outline: none;
+}
+
+/* ============================================
+   LEGEND
+   ============================================ */
+
+.topo-legend {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    background: color-mix(in srgb, var(--bg-secondary) 90%, transparent);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid;
+    flex-shrink: 0;
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
+.topo-empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Hide empty state once vis canvas has nodes */
+#topology-canvas:not(:empty) ~ #topo-empty {
+    display: none;
+}
+
+/* ============================================
+   DETAIL PANEL
+   ============================================ */
+
+.topo-detail-panel {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 360px;
+    max-height: calc(100% - 32px);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+    overflow: hidden;
+    animation: panelIn 0.2s ease;
+}
+
+@keyframes panelIn {
+    from { opacity: 0; transform: translateX(12px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+.detail-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+.detail-panel-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.detail-close-btn,
+.detail-refresh-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    transition: color 0.15s, background 0.15s;
+}
+
+.detail-close-btn:hover   { color: var(--danger);  background: var(--danger-soft); }
+.detail-refresh-btn:hover { color: var(--accent);  background: var(--accent-glow); }
+
+.detail-panel-body {
+    padding: 12px 14px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* Badges */
+.detail-badges {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.detail-status-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    border: 1px solid;
+}
+
+.detail-status-started   { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.detail-status-stopped   { color: var(--danger);  border-color: var(--danger);  background: var(--danger-soft); }
+.detail-status-suspended { color: var(--warning); border-color: var(--warning); background: var(--warning-soft); }
+.detail-status-unknown   { color: var(--text-secondary); border-color: var(--border-color); background: var(--bg-tertiary); }
+.detail-status-unreachable { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+
+.detail-console-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    background: var(--accent-glow);
+}
+
+/* Section label */
+.detail-section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+/* Table */
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+}
+
+.detail-table th {
+    color: var(--text-secondary);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color);
+    padding: 4px 6px;
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.detail-table td {
+    padding: 5px 6px;
+    color: var(--text-primary);
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+    vertical-align: middle;
+}
+
+.detail-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.detail-table .route-detail {
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Interface status dot */
+.iface-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 5px;
+    vertical-align: middle;
+}
+.dot-up   { background: var(--success); }
+.dot-down { background: var(--danger); }
+
+/* Route codes */
+.route-code {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid;
+}
+.route-c { color: var(--success); border-color: var(--success); background: var(--success-soft); }
+.route-s { color: var(--text-secondary); border-color: var(--border-color); background: var(--bg-tertiary); }
+.route-o { color: var(--accent); border-color: var(--accent); background: var(--accent-glow); }
+.route-e { color: #e0a800; border-color: #e0a800; background: var(--warning-soft); }
+.route-r { color: #c084fc; border-color: #c084fc; background: rgba(192,132,252,0.1); }
+.route-b { color: #fb923c; border-color: #fb923c; background: rgba(251,146,60,0.1); }
+
+/* Loading / offline states */
+.detail-loading,
+.detail-offline,
+.detail-empty {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+}
+
+.detail-offline { color: var(--danger); }
+
+/* Spinner */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
