@@ -3,8 +3,7 @@ Changed GUI from a runner clone to a web UI, now it uses the runner.py file dire
 # please improve GUI from here  
 
 # To Do:  
-- improve design and styles   
-- finish topology page (currently broken)  
+- improve design and styles    
 - add more pages for things like network statistics, topology view, IDS view, etc  
 
 # Run it:
@@ -24,6 +23,6 @@ python3 app.py
 
 # Pictures: 
 - i added light/dark toggle bar
+- fixed topology page, now the topology is a link where you can view and manage the topology in web. 
 ![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui_03_29.png)
-![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui2_03_29.png)
-![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/gui3_03_29.png)
+![GUI Screenshot](https://raw.githubusercontent.com/darienrh/CAPSTONE/GUI/top1.png)
