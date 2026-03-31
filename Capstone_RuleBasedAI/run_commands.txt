@@ -1,4 +1,0 @@
-python3 /home/user1/inject_problem/problem2.py
-
-
-python3 /home/user1/Capstone_AI/runner.py
