@@ -43,7 +43,7 @@ def include_gns3_node(node):
 
 
 class DiagnosticRunner:
-    def __init__(self, gns3_url="http://localhost:3080", username="admin",
+    def __init__(self, gns3_url="http://192.168.10.1:3080", username="admin",
                 password="qrWaprDfbrbUaYw8eMZTRz6cXRfV96PltLIT0gzTIMo7u5vksgVCIjz1iOSIbelS"):
         from urllib.parse import urlparse
         self.gns3_url = gns3_url.rstrip('/')
@@ -208,7 +208,6 @@ class DiagnosticRunner:
         self.knowledge_base.flush_knowledge()
 
     def _run_post_session_learning(self):
-        """After each session: mine new rules and optionally show IE traces."""
         history_len = len(self.knowledge_base.problem_history)
         if history_len >= RuleMiner.MIN_OCCURRENCES:
             self.reporter.print_info(f"\n[RuleMiner] Running post-session mining "
@@ -244,7 +243,7 @@ class DiagnosticRunner:
                 if not console_port:
                     progress.advance(task)
                     continue
-                tn = self.connections.get(device_name) or connect_device(console_port)
+                tn = self.connections.get(device_name) or connect_device(console_port, host=self.gns3_host)
                 if not tn:
                     progress.advance(task)
                     continue
@@ -304,7 +303,7 @@ class DiagnosticRunner:
                 console_port = self.nodes.get(device_name)
                 if not console_port:
                     return device_name, False, "No console port"
-                tn = self.connections.get(device_name) or connect_device(console_port)
+                tn = self.connections.get(device_name) or connect_device(console_port, host=self.gns3_host)
                 if not tn:
                     return device_name, False, "Connection failed"
 
