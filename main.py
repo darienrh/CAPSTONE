@@ -1,50 +1,57 @@
-import ospftree as ospf_issues
-import inferfacetree as intefacetree_issues
+import os
+import pandas as pd
+from nfstream import NFStreamer
 
-def OSPFdecisiontree(ospf_status):
-    if not ospf_status['ping_neighbor']:
-        return "Layer 1/2 connectivity issue. Check cables, interfaces, and IP connectivity."
-    if not ospf_status['protocol_89']:
-        return "OSPF packets blocked. Check ACL/firewall for IP protocol 89."
-    if ospf_status['neighbor_state'] == "DOWN":
-        if not ospf_status['hello_packets']:
-            return "No Hello packets. Check OSPF configuration, network types, and timers."
-        if ospf_status['area_id_mismatch']:
-            return "Area ID mismatch. Correct area configuration on both sides."
-        if ospf_status['subnet_mismatch']:
-            return "Subnet mask mismatch. Ensure matched subnet masks."
-        if ospf_status['timer_mismatch']:
-            return "Hello/dead interval mismatch. Configure timers to match."
-        return "Unknown reason for neighbor-down. Use debug and logs for deeper inspection."
-    if ospf_status['neighbor_state'] == "EXSTART" or ospf_status['neighbor_state'] == "EXCHANGE":
-        return "Adjacency stuck in EXSTART/EXCHANGE. Possible MTU mismatch."
-    if ospf_status['routes_missing']:
-        return "Route not in OSPF table. Check network statements and passive interfaces."
-    return "OSPF appears operational."
 
-def Intefacedecisiontree(status):
-    if status['down interface']:
-        intefacetree_issues.troubleshoot_interface(status)
-        return "Attempted to no shutdown interface."
+def process_all_pcaps():
+    pcap_folder = r'C:\Users\srsm3\PycharmProjects\CapstoneIDSML\pcaps'
+    output_file = "combined_network_data_v4.csv"
+    all_flows = []
 
-# Example usage:
-ospf_status = {
-    'ping_neighbor': True,
-    'protocol_89': True,
-    'neighbor_state': "DOWN",
-    'hello_packets': True,
-    'area_id_mismatch': False,
-    'subnet_mismatch': True,
-    'timer_mismatch': False,
-    'routes_missing': False
-}
+    if not os.path.exists(pcap_folder):
+        print(f"Error: {pcap_folder} not found.")
+        return
 
-def main_troubleshoot(status_info, protocol):
-    if protocol == 'OSPF':
-        return OSPFdecisiontree(status_info)
-    elif protocol == 'BGP':
-        return BGPdecisiontree(status_info)
-    elif protocol == 'OSPF':
-        return Intefacedecisiontree(status_info)
+    files = [f for f in os.listdir(pcap_folder) if f.endswith(('.pcap', '.pcapng'))]
+    print(f"Found {len(files)} files. Starting processing...")
+
+    for filename in files:
+        file_path = os.path.join(pcap_folder, filename)
+        print(f"Processing: {filename}...")
+
+        try:
+            # FIX 1: Add idle_timeout=10 to break long attacks into multiple flows
+            # This turns 1 giant attack flow into many 10-second segments
+            streamer = NFStreamer(source=file_path, statistical_analysis=True, idle_timeout=10)
+            df = streamer.to_pandas()
+
+            df['source_file'] = filename
+            df['label'] = 0
+            fname_upper = filename.upper()
+
+
+            #check every file for the attack behavior
+            ospf_attack = (df['protocol'] == 89) & (df['bidirectional_mean_piat_ms'] < 1000)
+            icmp_attack = (df['protocol'] == 1) & (df['bidirectional_mean_piat_ms'] < 100)
+
+            df.loc[ospf_attack | icmp_attack, 'label'] = 1
+
+            print(f"   -> Flows: {len(df)} | Attacks (Label 1): {df['label'].sum()}")
+
+            # FIX 2: Only append ONCE per file
+            all_flows.append(df)
+
+        except Exception as e:
+            print(f"Could not process {filename}: {e}")
+
+    if all_flows:
+        master_df = pd.concat(all_flows, ignore_index=True)
+        master_df.to_csv(output_file, index=False)
+        print("-" * 30)
+        print(f"Final Label Distribution:\n{master_df['label'].value_counts()}")
     else:
-        return "Unsupported protocol for troubleshooting."
+        print("No data collected.")
+
+
+if __name__ == '__main__':
+    process_all_pcaps()
