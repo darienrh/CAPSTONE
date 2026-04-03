@@ -4,7 +4,7 @@
 import telnetlib
 import time
 
-def connect_device(console_port, host='localhost', timeout=3):
+def connect_device(console_port, host='192.168.10.1', timeout=3):
     try:
         tn = telnetlib.Telnet(host, console_port, timeout=timeout)
         time.sleep(0.05)
