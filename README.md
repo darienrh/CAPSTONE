@@ -1,3 +1,7 @@
+UPDATE: Friday April 3 (today), most of the code in the vm should be fine, but replace runner.py and telnet_utils.py 
+
+
+
 All AI features implemented, still some bugs and optimizations needed. 
 
 Capstone_AI/     
