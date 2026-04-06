@@ -1,0 +1,1073 @@
+user1@ubuntu:~/Capstone_AI/history/configs$ cat config_stable50.txt
+Stable Configurations Timestamp: 2026-04-05 23:40:32
+================================================================================
+
+STABLE ROUTER CONFIGURATIONS
+================================================================================
+
+DEVICE: R1
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 2729 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R1
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.2.1 255.255.255.0
+ ip access-group CAPSTONE_ICMP_LOG in
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.1.1 255.255.255.0
+ duplex half
+!
+interface FastEthernet2/0
+ ip address 192.168.12.1 255.255.255.0
+ duplex half
+!
+interface FastEthernet3/0
+ ip address 192.168.231.101 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ network 192.168.1.0
+ network 192.168.2.0
+ network 192.168.12.0
+ auto-summary
+!
+ip classless
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+no ip http server
+!
+!
+!
+ip access-list extended CAPSTONE_ICMP_LOG
+ permit icmp any any log-input
+ permit ip any any
+logging 192.168.100.100
+logging 192.168.231.10
+no cdp log mismatch duplex
+!
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps tty
+snmp-server enable traps xgcp
+snmp-server enable traps cnpd
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps atm subif
+snmp-server enable traps channel
+snmp-server enable traps ima
+snmp-server enable traps srp
+snmp-server enable traps hsrp
+snmp-server enable traps config
+snmp-server enable traps entity
+snmp-server enable traps config-copy
+snmp-server enable traps envmon
+snmp-server enable traps aaa_server
+snmp-server enable traps syslog
+snmp-server enable traps bgp
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps ipmulticast
+snmp-server enable traps msdp
+snmp-server enable traps rsvp
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps rtr
+snmp-server enable traps vsimaster
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps dial
+snmp-server enable traps dsp card-status
+snmp-server enable traps voice poor-qov
+snmp-server enable traps dnis
+snmp-server host 192.168.100.100 version 2c CAPSTONE
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R1#
+
+DEVICE: R2
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 2667 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R2
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.2.2 255.255.255.0
+ ip access-group CAPSTONE_ICMP_LOG in
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.3.1 255.255.255.0
+ duplex half
+!
+interface FastEthernet2/0
+ ip address 192.168.231.102 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ network 192.168.2.0
+ network 192.168.3.0
+ auto-summary
+!
+ip classless
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+no ip http server
+!
+!
+!
+ip access-list extended CAPSTONE_ICMP_LOG
+ permit icmp any any log-input
+ permit ip any any
+logging 192.168.100.100
+logging 192.168.231.10
+arp 192.168.100.100 0200.4c4f.4f50 ARPA
+no cdp log mismatch duplex
+!
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps tty
+snmp-server enable traps xgcp
+snmp-server enable traps cnpd
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps atm subif
+snmp-server enable traps channel
+snmp-server enable traps ima
+snmp-server enable traps srp
+snmp-server enable traps hsrp
+snmp-server enable traps config
+snmp-server enable traps entity
+snmp-server enable traps config-copy
+snmp-server enable traps envmon
+snmp-server enable traps aaa_server
+snmp-server enable traps syslog
+snmp-server enable traps bgp
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps ipmulticast
+snmp-server enable traps msdp
+snmp-server enable traps rsvp
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps rtr
+snmp-server enable traps vsimaster
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps dial
+snmp-server enable traps dsp card-status
+snmp-server enable traps voice poor-qov
+snmp-server enable traps dnis
+snmp-server host 192.168.100.100 version 2c CAPSTONE
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R2#
+
+DEVICE: R3
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 2535 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R3
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.3.2 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.4.1 255.255.255.0
+ duplex half
+!
+interface FastEthernet2/0
+ ip address 192.168.231.103 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ network 192.168.3.0
+ network 192.168.4.0
+ auto-summary
+!
+ip classless
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+no ip http server
+!
+!
+logging 192.168.100.100
+logging 192.168.231.10
+arp 192.168.100.100 0200.4c4f.4f50 ARPA
+no cdp log mismatch duplex
+!
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps tty
+snmp-server enable traps xgcp
+snmp-server enable traps cnpd
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps atm subif
+snmp-server enable traps channel
+snmp-server enable traps ima
+snmp-server enable traps srp
+snmp-server enable traps hsrp
+snmp-server enable traps config
+snmp-server enable traps entity
+snmp-server enable traps config-copy
+snmp-server enable traps envmon
+snmp-server enable traps aaa_server
+snmp-server enable traps syslog
+snmp-server enable traps bgp
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps ipmulticast
+snmp-server enable traps msdp
+snmp-server enable traps rsvp
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps rtr
+snmp-server enable traps vsimaster
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps dial
+snmp-server enable traps dsp card-status
+snmp-server enable traps voice poor-qov
+snmp-server enable traps dnis
+snmp-server host 192.168.100.100 version 2c CAPSTONE
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R3#
+
+DEVICE: R4
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 5048 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R4
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+memory-size iomem 5
+no ip icmp rate-limit unreachable
+ip cef
+!
+!
+!
+!
+no ip domain lookup
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+!
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.6.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/0
+ ip address 192.168.8.2 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet0/1
+ ip address 192.168.231.104 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/1
+ ip address 192.168.9.1 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet1/0
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+router ospf 10
+ log-adjacency-changes
+ network 192.168.6.0 0.0.0.255 area 0
+ network 192.168.8.0 0.0.0.255 area 0
+ network 192.168.9.0 0.0.0.255 area 0
+!
+ip forward-protocol nd
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+!
+!
+no ip http server
+no ip http secure-server
+!
+logging 192.168.100.100
+logging 192.168.231.10
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps vrrp
+snmp-server enable traps ds1
+snmp-server enable traps tty
+snmp-server enable traps eigrp
+snmp-server enable traps xgcp
+snmp-server enable traps flash insertion removal
+snmp-server enable traps ds3
+snmp-server enable traps envmon
+snmp-server enable traps icsudsu
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps ds0-busyout
+snmp-server enable traps ds1-loopback
+snmp-server enable traps aaa_server
+snmp-server enable traps atm subif
+snmp-server enable traps bgp
+snmp-server enable traps bstun
+snmp-server enable traps bulkstat collection transfer
+snmp-server enable traps memory bufferpeak
+snmp-server enable traps cnpd
+snmp-server enable traps config-copy
+snmp-server enable traps config
+snmp-server enable traps dial
+snmp-server enable traps dlsw
+snmp-server enable traps dsp card-status
+snmp-server enable traps dsp oper-state
+snmp-server enable traps entity
+snmp-server enable traps fru-ctrl
+snmp-server enable traps resource-policy
+snmp-server enable traps event-manager
+snmp-server enable traps frame-relay multilink bundle-mismatch
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps hsrp
+snmp-server enable traps ipmobile
+snmp-server enable traps ipmulticast
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps msdp
+snmp-server enable traps mvpn
+snmp-server enable traps ospf state-change
+snmp-server enable traps ospf errors
+snmp-server enable traps ospf retransmit
+snmp-server enable traps ospf lsa
+snmp-server enable traps ospf cisco-specific state-change nssa-trans-change
+snmp-server enable traps ospf cisco-specific state-change shamlink interface-old
+snmp-server enable traps ospf cisco-specific state-change shamlink neighbor
+snmp-server enable traps ospf cisco-specific errors
+snmp-server enable traps ospf cisco-specific retransmit
+snmp-server enable traps ospf cisco-specific lsa
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps pppoe
+snmp-server enable traps cpu threshold
+snmp-server enable traps rsvp
+snmp-server enable traps ipsla
+snmp-server enable traps st
+
+DEVICE: R5
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 5050 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R5
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+memory-size iomem 5
+no ip icmp rate-limit unreachable
+ip cef
+!
+!
+!
+!
+no ip domain lookup
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+!
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.5.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/0
+ ip address 192.168.8.1 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet0/1
+ no ip address
+ shutdown
+ duplex auto
+ speed auto
+!
+interface Serial0/1
+ ip address 192.168.10.1 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet1/0
+ ip address 192.168.231.105 255.255.255.0
+ duplex auto
+ speed auto
+!
+router ospf 10
+ log-adjacency-changes
+ network 192.168.5.0 0.0.0.255 area 0
+ network 192.168.8.0 0.0.0.255 area 0
+ network 192.168.10.0 0.0.0.255 area 0
+!
+ip forward-protocol nd
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+!
+!
+no ip http server
+no ip http secure-server
+!
+logging 192.168.100.100
+logging 192.168.231.10
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps vrrp
+snmp-server enable traps ds1
+snmp-server enable traps tty
+snmp-server enable traps eigrp
+snmp-server enable traps xgcp
+snmp-server enable traps flash insertion removal
+snmp-server enable traps ds3
+snmp-server enable traps envmon
+snmp-server enable traps icsudsu
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps ds0-busyout
+snmp-server enable traps ds1-loopback
+snmp-server enable traps aaa_server
+snmp-server enable traps atm subif
+snmp-server enable traps bgp
+snmp-server enable traps bstun
+snmp-server enable traps bulkstat collection transfer
+snmp-server enable traps memory bufferpeak
+snmp-server enable traps cnpd
+snmp-server enable traps config-copy
+snmp-server enable traps config
+snmp-server enable traps dial
+snmp-server enable traps dlsw
+snmp-server enable traps dsp card-status
+snmp-server enable traps dsp oper-state
+snmp-server enable traps entity
+snmp-server enable traps fru-ctrl
+snmp-server enable traps resource-policy
+snmp-server enable traps event-manager
+snmp-server enable traps frame-relay multilink bundle-mismatch
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps hsrp
+snmp-server enable traps ipmobile
+snmp-server enable traps ipmulticast
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps msdp
+snmp-server enable traps mvpn
+snmp-server enable traps ospf state-change
+snmp-server enable traps ospf errors
+snmp-server enable traps ospf retransmit
+snmp-server enable traps ospf lsa
+snmp-server enable traps ospf cisco-specific state-change nssa-trans-change
+snmp-server enable traps ospf cisco-specific state-change shamlink interface-old
+snmp-server enable traps ospf cisco-specific state-change shamlink neighbor
+snmp-server enable traps ospf cisco-specific errors
+snmp-server enable traps ospf cisco-specific retransmit
+snmp-server enable traps ospf cisco-specific lsa
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps pppoe
+snmp-server enable traps cpu threshold
+snmp-server enable traps rsvp
+snmp-server enable traps ipsla
+snmp-serv
+
+DEVICE: R6
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 5078 bytes
+!
+version 12.4
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R6
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+memory-size iomem 5
+no ip icmp rate-limit unreachable
+ip cef
+!
+!
+!
+!
+no ip domain lookup
+!
+multilink bundle-name authenticated
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+archive
+ log config
+  hidekeys
+!
+!
+!
+!
+ip tcp synwait-time 5
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.7.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/0
+ ip address 192.168.9.2 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet0/1
+ ip address 192.168.11.1 255.255.255.0
+ duplex auto
+ speed auto
+!
+interface Serial0/1
+ ip address 192.168.10.2 255.255.255.0
+ clock rate 2000000
+!
+interface FastEthernet1/0
+ ip address 192.168.231.106 255.255.255.0
+ duplex auto
+ speed auto
+!
+router ospf 10
+ log-adjacency-changes
+ no auto-cost
+ network 192.168.7.0 0.0.0.255 area 0
+ network 192.168.9.0 0.0.0.255 area 0
+ network 192.168.10.0 0.0.0.255 area 0
+!
+ip forward-protocol nd
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+!
+!
+no ip http server
+no ip http secure-server
+!
+logging 192.168.100.100
+logging 192.168.231.10
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps vrrp
+snmp-server enable traps ds1
+snmp-server enable traps tty
+snmp-server enable traps eigrp
+snmp-server enable traps xgcp
+snmp-server enable traps flash insertion removal
+snmp-server enable traps ds3
+snmp-server enable traps envmon
+snmp-server enable traps icsudsu
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps ds0-busyout
+snmp-server enable traps ds1-loopback
+snmp-server enable traps aaa_server
+snmp-server enable traps atm subif
+snmp-server enable traps bgp
+snmp-server enable traps bstun
+snmp-server enable traps bulkstat collection transfer
+snmp-server enable traps memory bufferpeak
+snmp-server enable traps cnpd
+snmp-server enable traps config-copy
+snmp-server enable traps config
+snmp-server enable traps dial
+snmp-server enable traps dlsw
+snmp-server enable traps dsp card-status
+snmp-server enable traps dsp oper-state
+snmp-server enable traps entity
+snmp-server enable traps fru-ctrl
+snmp-server enable traps resource-policy
+snmp-server enable traps event-manager
+snmp-server enable traps frame-relay multilink bundle-mismatch
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps hsrp
+snmp-server enable traps ipmobile
+snmp-server enable traps ipmulticast
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps msdp
+snmp-server enable traps mvpn
+snmp-server enable traps ospf state-change
+snmp-server enable traps ospf errors
+snmp-server enable traps ospf retransmit
+snmp-server enable traps ospf lsa
+snmp-server enable traps ospf cisco-specific state-change nssa-trans-change
+snmp-server enable traps ospf cisco-specific state-change shamlink interface-old
+snmp-server enable traps ospf cisco-specific state-change shamlink neighbor
+snmp-server enable traps ospf cisco-specific errors
+snmp-server enable traps ospf cisco-specific retransmit
+snmp-server enable traps ospf cisco-specific lsa
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps pppoe
+snmp-server enable traps cpu threshold
+snmp-server enable traps rsvp
+snmp-server e
+
+DEVICE: R7
+============================================================
+show running-config
+Building configuration...
+
+Current configuration : 2911 bytes
+!
+version 12.3
+service timestamps debug datetime msec
+service timestamps log datetime msec
+no service password-encryption
+!
+hostname R7
+!
+boot-start-marker
+boot-end-marker
+!
+!
+no aaa new-model
+ip subnet-zero
+no ip icmp rate-limit unreachable
+!
+!
+ip cef
+ip tcp synwait-time 5
+no ip domain lookup
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+!
+interface FastEthernet0/0
+ ip address 192.168.11.2 255.255.255.0
+ duplex half
+!
+interface FastEthernet1/0
+ ip address 192.168.12.2 255.255.255.0
+ duplex half
+!
+interface FastEthernet2/0
+ ip address 192.168.231.107 255.255.255.0
+ duplex half
+!
+router eigrp 1
+ redistribute ospf 10 metric 1000 1000 255 1 1500 route-map OSPFtoEIGRP
+ network 192.168.12.2 0.0.0.0
+ no auto-summary
+!
+router ospf 10
+ log-adjacency-changes
+ redistribute eigrp 1 subnets route-map EIGRPtoOSPF
+ network 192.168.11.2 0.0.0.0 area 0
+!
+ip classless
+ip route 0.0.0.0 0.0.0.0 192.168.231.1
+no ip http server
+!
+!
+logging 192.168.100.100
+logging 192.168.231.10
+arp 192.168.100.100 0200.4c4f.4f50 ARPA
+no cdp log mismatch duplex
+!
+route-map OSPFtoEIGRP deny 5
+ match tag 20
+!
+route-map OSPFtoEIGRP permit 10
+ set tag 10
+!
+route-map EIGRPtoOSPF deny 5
+ match tag 10
+!
+route-map EIGRPtoOSPF permit 10
+ set tag 20
+!
+snmp-server community CAPSTONE RO
+snmp-server community public RO
+snmp-server ifindex persist
+snmp-server location GNS3-Lab
+snmp-server contact admin
+snmp-server enable traps snmp authentication linkdown linkup coldstart warmstart
+snmp-server enable traps tty
+snmp-server enable traps xgcp
+snmp-server enable traps cnpd
+snmp-server enable traps isdn call-information
+snmp-server enable traps isdn layer2
+snmp-server enable traps isdn chan-not-avail
+snmp-server enable traps isdn ietf
+snmp-server enable traps atm subif
+snmp-server enable traps channel
+snmp-server enable traps ima
+snmp-server enable traps srp
+snmp-server enable traps hsrp
+snmp-server enable traps config
+snmp-server enable traps entity
+snmp-server enable traps config-copy
+snmp-server enable traps envmon
+snmp-server enable traps aaa_server
+snmp-server enable traps syslog
+snmp-server enable traps bgp
+snmp-server enable traps pim neighbor-change rp-mapping-change invalid-pim-message
+snmp-server enable traps ipmulticast
+snmp-server enable traps msdp
+snmp-server enable traps rsvp
+snmp-server enable traps frame-relay
+snmp-server enable traps frame-relay subif
+snmp-server enable traps rtr
+snmp-server enable traps vsimaster
+snmp-server enable traps mpls ldp
+snmp-server enable traps mpls traffic-eng
+snmp-server enable traps mpls vpn
+snmp-server enable traps dial
+snmp-server enable traps dsp card-status
+snmp-server enable traps voice poor-qov
+snmp-server enable traps dnis
+snmp-server host 192.168.100.100 version 2c CAPSTONE
+!
+!
+!
+!
+!
+!
+line con 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line aux 0
+ exec-timeout 0 0
+ privilege level 15
+ logging synchronous
+ stopbits 1
+line vty 0 4
+ login
+!
+!
+end
+
+R7#
