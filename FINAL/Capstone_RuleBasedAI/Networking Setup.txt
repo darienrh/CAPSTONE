@@ -1,0 +1,77 @@
+Networking Setup: 
+
+PC (Host)
+├── GNS3 ──────────────────────────────────┐
+│   └── Routers (R1-R7)                   │  REST API :3080
+│                                          │  Telnet console ports
+├── Kali VM                                │
+│   ├── OSPF flood attack script           │
+│   └── His IDS scripts                   │
+│       └── POST alerts ──────────────►   │
+│                                          │
+└── Ubuntu VM  ◄───────────────────────────┘
+    ├── Your Flask/SocketIO server
+    ├── DiagnosticRunner → talks to GNS3 on host
+    └── Browser GUI (topology, IDS page, chatbot)
+
+Ubuntu VM
+├── Flask server (your GUI)
+├── DiagnosticRunner (on-demand scans)
+└── IDS Monitor (new — continuous background thread)
+    ├── Every N seconds, polls all routers via existing Telnet utils
+    ├── Compares OSPF stats against baseline thresholds
+    ├── On detection → POST to /api/ids/alert (your own server)
+    └── Optionally triggers DiagnosticRunner on affected device
+
+-------------------------------------------------------------------------------------
+VMware Virtual Network Setup
+First, in VMware Workstation → Edit → Virtual Network Editor, two networks are configured:
+
+VMnet1		Host-only	192.168.231.0/24  (actual assigned subnet)
+VMnet8		NAT		192.168.95.0/24   (DHCP managed by VMware)
+-------------------------------------------------------------------------------------
+Ubuntu VM Adapters
+Two network adapters in VM Settings:
+ens33 (Adapter 1)	VMnet8		NAT		DHCP (internet access)
+ens34 (Adapter 2)	VMnet1		Host-only	192.168.231.10/24
+
+Configure the static IP in Ubuntu:
+sudo nmcli con mod "Wired connection 1" ipv4.addresses 192.168.231.10/24 ipv4.method manual ipv4.gateway ""
+sudo nmcli con up "Wired connection 1"
+-------------------------------------------------------------------------------------
+Kali VM Adapters
+eth0 (Adapter 1)	VMnet1		Host-only	192.168.231.20/24
+eth1 (Adapter 2)	VMnet8		NAT		DHCP
+
+Configure static IP on Kali:
+sudo ip addr add 192.168.231.20/24 dev eth0
+sudo ip link set eth0 up
+(or persist via /etc/network/interfaces)
+-------------------------------------------------------------------------------------
+Host PC (Windows) VMnet1 Adapter
+IP:      192.168.231.1
+Subnet:  255.255.255.0
+Gateway: (leave blank)
+-------------------------------------------------------------------------------------
+In GNS3: Edit → Preferences → Server → Local Server
+GNS3 Port Settings (Host PC)
+Setting			Value
+Host binding		192.168.231.1
+Server port		3080
+Console port range	5100 - 5199
+UDP tunneling range	10000 - 10099
+-------------------------------------------------------------------------------------
+PowerShell on Host:
+New-NetFirewallRule -DisplayName "GNS3 API" -Direction Inbound -Protocol TCP -LocalPort 3080 -Action Allow
+New-NetFirewallRule -DisplayName "GNS3 Console" -Direction Inbound -Protocol TCP -LocalPort 5100-5199 -Action Allow
+New-NetFirewallRule -DisplayName "GNS3 UDP" -Direction Inbound -Protocol UDP -LocalPort 10000-10099 -Action Allow
+New-NetFirewallRule -DisplayName "ICMP Allow" -Direction Inbound -Protocol ICMPv4 -Action Allow
+
+--> Restart GNS3 (not full PC reboot required, just restart GNS3 after binding change)
+-------------------------------------------------------------------------------------
+Verify connectivity from Ubuntu:
+ping 192.168.231.1
+curl http://192.168.231.1:3080/v2/version
+
+Verify GUI access from Host PC browser:
+http://192.168.231.10:5000

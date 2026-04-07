@@ -1,0 +1,15 @@
+[kali]
+host = 192.168.65.129
+user = kali
+password = kali
+tcp_flood_script = /home/kali/tcp_flood.py
+ospf_attack_script = /home/kali/ospf_attack_v2.py
+
+[host_pc]
+host = 192.168.65.1
+user = samha
+password = Netpass0
+ids_script = D:/school_code/Capstone_RuleBasedAI/IDS/CombinedIDS.py
+
+[ubuntu]
+problem2_script = /home/user1/inject_problem/problem2.py
