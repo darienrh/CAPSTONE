@@ -1,4 +1,4 @@
-"""Version 2 (Not all of these problems are correctly fixed yet)"""
+"""Version 2 - Quick problem injection for demo (no user input, no write memory)"""
 
 import telnetlib
 import requests
@@ -13,15 +13,18 @@ def get_console_port(gns3_url, project_id, device_name, auth):
     try:
         response = requests.get(
             f"{gns3_url}/v2/projects/{project_id}/nodes",
-            auth=auth
+            auth=auth,
+            timeout=5
         )
+        response.raise_for_status()
         nodes = response.json()
 
         for node in nodes:
             if node['name'] == device_name:
                 return node.get('console')
         return None
-    except:
+    except Exception as e:
+        print(f"Error getting console port for {device_name}: {e}")
         return None
 
 
@@ -34,29 +37,38 @@ def send_commands_bulk(tn, commands, delay=0.3):
         time.sleep(0.5)
         tn.read_very_eager()
         return True
-    except:
+    except Exception as e:
+        print(f"Error sending commands: {e}")
         return False
 
 
 def clear_and_enable(tn):
     """Clear line and get to enable mode"""
-    tn.write(b'\x03')
-    time.sleep(0.2)
-    tn.write(b'enable\r\n')
-    time.sleep(0.2)
-    tn.read_very_eager()
+    try:
+        tn.write(b'\x03\r\n')
+        time.sleep(0.2)
+        tn.write(b'enable\r\n')
+        time.sleep(0.2)
+        tn.read_very_eager()
+        return True
+    except Exception as e:
+        print(f"Error in clear_and_enable: {e}")
+        return False
 
 
-def inject_problems_on_device(device_name, port, problem_set):
+def inject_problems_on_device(device_name, port, problem_set, gns3_host='localhost'):
     """Inject all problems on a single device in one session"""
     results = []
-
+    
     try:
-        tn = telnetlib.Telnet('localhost', port, timeout=5)
-        clear_and_enable(tn)
-
+        tn = telnetlib.Telnet(gns3_host, port, timeout=5)
+        
+        if not clear_and_enable(tn):
+            tn.close()
+            return []
+        
         all_commands = ["configure terminal"]
-
+        
         for problem_type, params in problem_set:
             if problem_type == 'shutdown':
                 all_commands.extend([
@@ -65,7 +77,7 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: {params['interface']} shutdown")
-
+            
             elif problem_type == 'eigrp_stub':
                 all_commands.extend([
                     "router eigrp 1",
@@ -73,7 +85,7 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: EIGRP stub configured")
-
+            
             elif problem_type == 'eigrp_k_values':
                 all_commands.extend([
                     "router eigrp 1",
@@ -81,7 +93,7 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: EIGRP non-default K-values")
-
+            
             elif problem_type == 'eigrp_passive':
                 all_commands.extend([
                     "router eigrp 1",
@@ -89,7 +101,7 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: EIGRP passive interface {params['interface']}")
-
+            
             elif problem_type == 'eigrp_timers':
                 all_commands.extend([
                     f"interface {params['interface']}",
@@ -98,16 +110,15 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: EIGRP non-default timers on {params['interface']}")
-
+            
             elif problem_type == 'ospf_stub':
-                # Configure a non-backbone area as stub
                 all_commands.extend([
                     "router ospf 10",
                     f"area {params.get('area', '1')} stub",
                     "exit"
                 ])
                 results.append(f"{device_name}: OSPF area {params.get('area', '1')} stub")
-
+            
             elif problem_type == 'ospf_passive':
                 all_commands.extend([
                     "router ospf 10",
@@ -115,7 +126,7 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: OSPF passive interface {params['interface']}")
-
+            
             elif problem_type == 'ospf_timers':
                 all_commands.extend([
                     f"interface {params['interface']}",
@@ -124,9 +135,8 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: OSPF non-default timers on {params['interface']}")
-
+            
             elif problem_type == 'ospf_wrong_area_network':
-                # Move a network statement to the wrong area via OSPF router config
                 all_commands.extend([
                     "router ospf 10",
                     f"no network {params['network']} {params['wildcard']} area {params['correct_area']}",
@@ -134,7 +144,7 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: OSPF wrong area on {params['network']} (area {params['wrong_area']} instead of area {params['correct_area']})")
-
+            
             elif problem_type == 'ospf_dup_rid':
                 all_commands.extend([
                     "router ospf 10",
@@ -142,208 +152,127 @@ def inject_problems_on_device(device_name, port, problem_set):
                     "exit"
                 ])
                 results.append(f"{device_name}: OSPF router-id {params.get('rid', '1.1.1.1')}")
-
+        
         all_commands.append("end")
-
+        
         if send_commands_bulk(tn, all_commands):
             tn.close()
             return results
-
+        
         tn.close()
         return []
-
+    
     except Exception as e:
+        print(f"Exception on {device_name}: {e}")
         return []
 
 
 def main():
-    print("Starting minimal problem injection (one of each type)...\n")
-
-    GNS3_URL = "http://localhost:3080"
-    auth = HTTPBasicAuth("admin", "qrWaprDfbrbUaYw8eMZTRz6cXRfV96PltLIT0gzTIMo7u5vksgVCIjz1iOSIbelS")
-
+    print("Injecting problems for demo...\n")
+    
+    GNS3_URL = "http://192.168.231.1:3080"
+    USERNAME = "admin"
+    PASSWORD = "qrWaprDfbrbUaYw8eMZTRz6cXRfV96PltLIT0gzTIMo7u5vksgVCIjz1iOSIbelS"
+    auth = HTTPBasicAuth(USERNAME, PASSWORD)
+    
+    from urllib.parse import urlparse
+    gns3_host = urlparse(GNS3_URL).hostname
+    
     try:
-        response = requests.get(f"{GNS3_URL}/v2/projects", auth=auth)
+        response = requests.get(f"{GNS3_URL}/v2/projects", auth=auth, timeout=5)
+        response.raise_for_status()
         projects = response.json()
-
+        
         project_id = None
         for project in projects:
             if project['status'] == 'opened':
                 project_id = project['project_id']
                 break
-
+        
         if not project_id:
             print("No opened project found")
             return
-    except:
-        print("Failed to connect to GNS3")
+    except Exception as e:
+        print(f"Failed to connect to GNS3: {e}")
         return
-
+    
     devices = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']
     ports = {}
-
+    
     for device in devices:
         port = get_console_port(GNS3_URL, project_id, device, auth)
         if port:
             ports[device] = port
-            print(f"Found {device} on port {port}")
-
+    
     if not ports:
         print("No devices found")
         return
-
-    # Minimal problem set - ONE of each type
+    
     problem_definitions = {
-        # Interface shutdown - one device
         'R1': [
             ('shutdown', {'interface': 'FastEthernet1/0'})
         ],
-
-        # EIGRP problems - one of each
         'R2': [
-            ('eigrp_passive', {'interface': 'FastEthernet1/0'}),  # Wrong passive
-            ('eigrp_stub', {})                                     # Incorrect stub
+            ('eigrp_passive', {'interface': 'FastEthernet1/0'}),
+            ('eigrp_stub', {})
         ],
-
         'R3': [
-            ('eigrp_k_values', {}),                                      # Non-default K-values
-            ('eigrp_timers', {'interface': 'FastEthernet0/0'})           # Timer mismatch
+            ('eigrp_k_values', {}),
+            ('eigrp_timers', {'interface': 'FastEthernet0/0'})
         ],
-
-        # OSPF problems - one of each
         'R4': [
-            ('ospf_timers', {'interface': 'Serial0/0'})            # Hello/dead mismatch
+            ('ospf_timers', {'interface': 'Serial0/0'})
         ],
-
         'R5': [
-            ('ospf_stub', {'area': '1'}),                          # Unexpected stub area
-            ('ospf_wrong_area_network', {                          # Wrong area via network statement
+            ('ospf_stub', {'area': '1'}),
+            ('ospf_wrong_area_network', {
                 'network': '192.168.10.0',
                 'wildcard': '0.0.0.255',
                 'correct_area': '0',
                 'wrong_area': '1'
             }),
-            ('ospf_dup_rid', {'rid': '1.1.1.1'})                  # Duplicate RID (part 1)
+            ('ospf_dup_rid', {'rid': '1.1.1.1'})
         ],
-
         'R6': [
-            ('ospf_passive', {'interface': 'FastEthernet0/0'}),    # Wrong passive
-            ('ospf_dup_rid', {'rid': '1.1.1.1'})                  # Duplicate RID (part 2)
+            ('ospf_passive', {'interface': 'FastEthernet0/0'}),
+            ('ospf_dup_rid', {'rid': '1.1.1.1'})
         ]
     }
-
-    print("\n" + "="*70)
-    print("PROBLEM INJECTION PLAN (One of Each Type):")
-    print("="*70)
-
-    # Show what will be injected
-    total_problems = 0
-    for device, problems in problem_definitions.items():
-        if device in ports:
-            print(f"\n{device}:")
-            for problem_type, params in problems:
-                total_problems += 1
-                if problem_type == 'shutdown':
-                    print(f"  • Interface {params['interface']} shutdown")
-                elif problem_type == 'eigrp_stub':
-                    print(f"  • EIGRP stub (incorrect)")
-                elif problem_type == 'eigrp_k_values':
-                    print(f"  • EIGRP non-default K-values")
-                elif problem_type == 'eigrp_passive':
-                    print(f"  • EIGRP passive interface {params['interface']}")
-                elif problem_type == 'eigrp_timers':
-                    print(f"  • EIGRP timers on {params['interface']}")
-                elif problem_type == 'ospf_stub':
-                    print(f"  • OSPF area {params.get('area', '1')} stub")
-                elif problem_type == 'ospf_passive':
-                    print(f"  • OSPF passive interface {params['interface']}")
-                elif problem_type == 'ospf_timers':
-                    print(f"  • OSPF timers on {params['interface']}")
-                elif problem_type == 'ospf_wrong_area_network':
-                    print(f"  • OSPF network {params['network']} moved to area {params['wrong_area']} (was area {params['correct_area']})")
-                elif problem_type == 'ospf_dup_rid':
-                    print(f"  • OSPF router-id {params.get('rid', '1.1.1.1')}")
-
-    print(f"\n{'='*70}")
-    print("SUMMARY:")
-    print("  • 1x Interface shutdown")
-    print("  • 1x EIGRP passive interface (incorrect) [R2 FastEthernet1/0]")
-    print("  • 1x EIGRP stub (incorrect)")
-    print("  • 1x EIGRP K-values (non-default)")
-    print("  • 1x EIGRP timers (non-default)")
-    print("  • 1x OSPF passive interface (incorrect)")
-    print("  • 1x OSPF timers (non-default)")
-    print("  • 1x OSPF stub area (unexpected)")
-    print("  • 1x OSPF wrong area (network 192.168.10.0 moved from area 0 to area 1)")
-    print("  • 1x OSPF duplicate RID (R5 and R6 both = 1.1.1.1)")
-    print(f"\nTotal: {total_problems} configuration changes")
-    print("="*70)
-
-    response = input("\nProceed with injection? [y/N]: ").strip().lower()
-    if response != 'y':
-        print("Aborted.")
-        return
-
-    print("\nInjecting problems concurrently...")
+    
+    print("Injecting problems...")
     start_time = time.time()
-
+    
     injected = []
-
+    
     with ThreadPoolExecutor(max_workers=6) as executor:
         futures = {}
-
+        
         for device, port in ports.items():
             if device in problem_definitions:
                 future = executor.submit(
                     inject_problems_on_device,
                     device,
                     port,
-                    problem_definitions[device]
+                    problem_definitions[device],
+                    gns3_host
                 )
                 futures[future] = device
-
+        
         for future in as_completed(futures):
             device = futures[future]
             try:
                 results = future.result()
                 injected.extend(results)
-                print(f"✓ Completed {device}: {len(results)} problems")
+                print(f"✓ {device}: {len(results)} problems")
             except Exception as e:
-                print(f"✗ Failed {device}: {e}")
-
+                print(f"✗ {device}: {e}")
+    
     elapsed = time.time() - start_time
-
-    print("\n" + "="*70)
-    print("INJECTION COMPLETE:")
-    print("="*70)
-
-    # Group by category
-    interface_issues = [p for p in injected if 'shutdown' in p]
-    eigrp_issues = [p for p in injected if 'EIGRP' in p]
-    ospf_issues = [p for p in injected if 'OSPF' in p]
-
-    if interface_issues:
-        print("\nINTERFACE PROBLEMS:")
-        for problem in interface_issues:
-            print(f"  ✓ {problem}")
-
-    if eigrp_issues:
-        print("\nEIGRP PROBLEMS:")
-        for problem in eigrp_issues:
-            print(f"  ✓ {problem}")
-
-    if ospf_issues:
-        print("\nOSPF PROBLEMS:")
-        for problem in ospf_issues:
-            print(f"  ✓ {problem}")
-
-    print(f"\n{'='*70}")
-    print(f"Successfully injected: {len(injected)}/{total_problems} problems")
-    print(f"Time: {elapsed:.2f} seconds")
-    print("="*70)
-
-    print("\n💡 TIP: Run your diagnostic runner to detect these problems!")
-    print("   python3 runner.py\n")
+    
+    print(f"\n{'='*50}")
+    print(f"Injected {len(injected)} problems in {elapsed:.2f}s")
+    print("="*50)
+    print("\nReady for demo - run the diagnostic tool!")
 
 
 if __name__ == "__main__":

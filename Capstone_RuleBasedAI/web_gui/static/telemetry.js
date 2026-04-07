@@ -9,6 +9,26 @@ function getChartTheme() {
     };
 }
 
+const BPS_TICKS = [
+    100, 200, 300, 400, 500, 600, 700, 800, 900,
+    1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000
+];
+const KBPS_TICKS = [
+    100000, 200000, 300000, 400000, 500000, 600000, 700000, 800000, 900000
+];
+const MBPS_TICKS = [
+    1000000, 1100000, 1200000, 1300000, 1400000, 1500000, 1600000, 1700000, 1800000, 1900000, 2000000
+];
+
+function getDynamicTicks(chart) {
+    const max = Math.max(0, ...chart.data.datasets.flatMap(ds => ds.data));
+    let pool;
+    if (max >= 1000000) pool = [0, ...KBPS_TICKS, ...MBPS_TICKS];
+    else if (max >= 2000) pool = [0, ...KBPS_TICKS];
+    else pool = [0, ...BPS_TICKS];
+    return pool.filter(v => v <= Math.max(max * 1.2, pool[1])).map(v => ({ value: v }));
+}
+
 const chartOptions = {
     responsive: true,
     animation: false,
@@ -18,8 +38,9 @@ const chartOptions = {
             grid: { color: getChartTheme().grid },
             ticks: {
                 color: getChartTheme().text,
-                callback: v => v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? (v / 1000).toFixed(1) + 'K' : v
-            }
+                callback: v => v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v
+            },
+            afterBuildTicks: axis => { axis.ticks = getDynamicTicks(axis.chart); }
         },
         x: {
             grid: { color: getChartTheme().grid },
@@ -41,9 +62,9 @@ const chartOut = new Chart(
 
 const devicePeaks = {};
 const deviceLastSeen = {};
-const socket = io();
 
 socket.on('telemetry_update', function (msg) {
+    if (!msg || !msg.data || typeof msg.data !== 'object') return;
     const ts = msg.timestamp;
     [chartIn, chartOut].forEach(c => {
         c.data.labels.push(ts);
@@ -69,6 +90,7 @@ socket.on('telemetry_update', function (msg) {
 
 socket.on('ids_alert', function (alert) {
     const tbody = document.getElementById('ids-table-body');
+    if (!tbody) return;
     const placeholder = tbody.querySelector('td[colspan]');
     if (placeholder) placeholder.parentElement.remove();
 
@@ -93,8 +115,7 @@ socket.on('ids_alert', function (alert) {
 });
 
 function showAlertPopup(alert) {
-    const existing = document.getElementById('ids-popup');
-    if (existing) existing.remove();
+    document.getElementById('ids-popup')?.remove();
 
     const popup = document.createElement('div');
     popup.id = 'ids-popup';
@@ -104,45 +125,76 @@ function showAlertPopup(alert) {
         background:var(--bg-secondary);border:2px solid var(--danger);
         border-radius:12px;box-shadow:0 0 40px rgba(218,54,51,0.4);padding:0;
     `;
-    popup.innerHTML = `
-        <div style="background:var(--danger-soft);border-bottom:1px solid var(--danger);padding:12px 16px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:10px;">
-            <i class="bi bi-exclamation-triangle-fill" style="color:var(--danger);font-size:1.2rem;"></i>
-            <span style="font-weight:700;color:var(--danger);font-size:1rem;">HIGH SEVERITY ALERT</span>
-        </div>
-        <div style="padding:16px;">
-            <div style="font-family:'JetBrains Mono',monospace;font-size:0.85rem;color:var(--text-primary);margin-bottom:12px;">${alert.details}</div>
-            <div style="display:flex;gap:8px;font-size:0.75rem;color:var(--text-secondary);margin-bottom:16px;">
-                <span>Device: <strong style="color:var(--text-primary);">${alert.target_device}</strong></span>
-                <span>•</span>
-                <span>Protocol: <strong style="color:var(--text-primary);">${alert.protocol}</strong></span>
-                <span>•</span>
-                <span>${alert.timestamp.split('T')[1]?.slice(0, 8)}</span>
-            </div>
-            
-            <div style="display:flex;gap:8px;justify-content:flex-end;">
-                <button onclick="runTroubleshooter('${alert.target_device}')"
-                    style="background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:7px;font-weight:600;cursor:pointer;">
-                    <i class="bi bi-tools"></i> Run Troubleshooter
-                </button>
-                <button onclick="document.getElementById('ids-popup').remove()"
-                    style="background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border-color);padding:8px 16px;border-radius:7px;font-weight:600;cursor:pointer;">
-                    Dismiss
-                </button>
-            </div>
-        </div>
-    `;
+
+    const head = document.createElement('div');
+    head.style.cssText = 'background:var(--danger-soft);border-bottom:1px solid var(--danger);padding:12px 16px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:10px;';
+    head.innerHTML = '<i class="bi bi-exclamation-triangle-fill" style="color:var(--danger);font-size:1.2rem;"></i><span style="font-weight:700;color:var(--danger);font-size:1rem;">HIGH SEVERITY ALERT</span>';
+
+    const body = document.createElement('div');
+    body.style.padding = '16px';
+
+    const detailEl = document.createElement('div');
+    detailEl.style.cssText = 'font-family:\'JetBrains Mono\',monospace;font-size:0.85rem;color:var(--text-primary);margin-bottom:12px;';
+    detailEl.textContent = alert.details || '';
+
+    const meta = document.createElement('div');
+    meta.style.cssText = 'display:flex;gap:8px;font-size:0.75rem;color:var(--text-secondary);margin-bottom:16px;flex-wrap:wrap;align-items:center;';
+    const dev = document.createElement('span');
+    dev.innerHTML = 'Device: <strong style="color:var(--text-primary);"></strong>';
+    dev.querySelector('strong').textContent = alert.target_device || '';
+    const proto = document.createElement('span');
+    proto.innerHTML = 'Protocol: <strong style="color:var(--text-primary);"></strong>';
+    proto.querySelector('strong').textContent = alert.protocol || '';
+    const timeSp = document.createElement('span');
+    timeSp.textContent = (alert.timestamp && alert.timestamp.split('T')[1]?.slice(0, 8)) || '';
+    meta.appendChild(dev);
+    meta.appendChild(document.createTextNode('•'));
+    meta.appendChild(proto);
+    meta.appendChild(document.createTextNode('•'));
+    meta.appendChild(timeSp);
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+
+    const runBtn = document.createElement('button');
+    runBtn.type = 'button';
+    runBtn.style.cssText = 'background:var(--accent);color:#fff;border:none;padding:8px 16px;border-radius:7px;font-weight:600;cursor:pointer;';
+    runBtn.innerHTML = '<i class="bi bi-tools"></i> Run Troubleshooter';
+    runBtn.addEventListener('click', () => {
+        runTroubleshooter(alert.target_device, alert.protocol, alert.attack_type);
+    });
+
+    const dismissBtn = document.createElement('button');
+    dismissBtn.type = 'button';
+    dismissBtn.style.cssText = 'background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border-color);padding:8px 16px;border-radius:7px;font-weight:600;cursor:pointer;';
+    dismissBtn.textContent = 'Dismiss';
+    dismissBtn.addEventListener('click', () => popup.remove());
+
+    actions.appendChild(runBtn);
+    actions.appendChild(dismissBtn);
+
+    body.appendChild(detailEl);
+    body.appendChild(meta);
+    body.appendChild(actions);
+    popup.appendChild(head);
+    popup.appendChild(body);
     document.body.appendChild(popup);
 }
 
-function runTroubleshooter(device) {
+function runTroubleshooter(_device, protocol, attackType) {
     document.getElementById('ids-popup')?.remove();
-    const gns3Url = document.getElementById('gns3-url').value || 'http://192.168.231.1:3080';
+    const raw =
+        (document.getElementById('telemetry-gns3-url')?.value ||
+            document.getElementById('gns3-url')?.value ||
+            '').trim();
+    const gns3Url = raw || 'http://192.168.231.1:3080';
+    const idsMap = { 'TCP': 'tcp_flood', 'OSPF': 'ospf_attack' };
+    const idsTrigger = (attackType === 'ml_detection' && idsMap[protocol]) || null;
+    if (typeof showView === 'function') showView('diagnostics');
     fetch('/api/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gns3_url: gns3Url, devices: device })
-    }).then(() => {
-        window.location.href = '/';
+        body: JSON.stringify({ gns3_url: gns3Url, devices: 'all', ids_trigger: idsTrigger })
     });
 }
 
@@ -167,14 +219,35 @@ function fmtBps(v) {
     return v + ' bps';
 }
 
+function updatePacketDropWarnings(droppingDevices) {
+    const row = document.getElementById('packet-drop-row');
+    const container = document.getElementById('packet-drop-warnings');
+    if (!row || !container) return;
+    if (droppingDevices.length === 0) {
+        row.style.display = 'none';
+        container.innerHTML = '';
+        return;
+    }
+    row.style.display = '';
+    container.innerHTML = droppingDevices.map(dev => `
+        <div class="packet-drop-message">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <strong>${dev}</strong> is experiencing irregular traffic patterns, and dropping packets.
+            <span class="suggestion">Suggestion: Investigate ${dev} and its corresponding End-Devices.</span>
+        </div>
+    `).join('');
+}
+
 function updateTable(data) {
     const tbody = document.getElementById('stats-table-body');
     tbody.innerHTML = '';
+    const droppingDevices = [];
     for (const [device, v] of Object.entries(data)) {
-        const peaks = devicePeaks[device] || { in: 0, out: 0 };
         const uptimeSec = Math.floor((v.uptime || 0) / 100);
         const h = Math.floor(uptimeSec / 3600), m = Math.floor((uptimeSec % 3600) / 60);
         const uptimeStr = `${h}h ${m}m`;
+        const errTotal = (v.err_in ?? 0) + (v.err_out ?? 0);
+        if (errTotal > 1) droppingDevices.push(device);
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td><strong>${device}</strong></td>
@@ -182,12 +255,13 @@ function updateTable(data) {
             <td class="text-warning">${fmtBps(v.out_bps ?? 0)}</td>
             <td>${v.cpu ?? '-'}%</td>
             <td>${v.mem_pct ?? '-'}%</td>
-            <td class="${(v.err_in + v.err_out) > 0 ? 'text-danger' : 'text-secondary'}">${(v.err_in ?? 0) + (v.err_out ?? 0)}</td>
+            <td class="${errTotal > 0 ? 'text-danger' : 'text-secondary'}">${errTotal}</td>
             <td class="text-secondary">${uptimeStr}</td>
             <td class="text-secondary">${deviceLastSeen[device] || '-'}</td>
         `;
         tbody.appendChild(tr);
     }
+    updatePacketDropWarnings(droppingDevices);
 }
 
 function updateStatCards(data) {
@@ -211,25 +285,34 @@ function updateStatCards(data) {
     }
 }
 
-function startTelemetry() {
-    const gns3Url = document.getElementById('gns3-url').value || 'http://192.168.231.1:3080';
-    const devicesRaw = document.getElementById('devices').value.trim();
+async function startTelemetry() {
+    const gns3El = document.getElementById('telemetry-gns3-url');
+    const devEl = document.getElementById('telemetry-devices');
+    const gns3Url = (gns3El && gns3El.value) || 'http://192.168.231.1:3080';
+    const devicesRaw = (devEl && devEl.value) ? devEl.value.trim() : '';
     const devices = devicesRaw ? devicesRaw.split(',').map(d => d.trim()).filter(Boolean) : [];
-    fetch('/api/telemetry/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gns3_url: gns3Url, devices })
-    }).then(r => r.json()).then(data => {
-        if (data.error) { alert(data.error); return; }
-        document.getElementById('btn-start').disabled = true;
-        document.getElementById('btn-stop').disabled = false;
-    });
+    let r;
+    try {
+        r = await fetch('/api/telemetry/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gns3_url: gns3Url, devices })
+        });
+    } catch (_) {
+        return;
+    }
+    const data = await r.json().catch(() => ({}));
+    if (data.error) { alert(data.error); return; }
+    const btnStart = document.getElementById('telemetry-btn-start');
+    const btnStop = document.getElementById('telemetry-btn-stop');
+    if (btnStart) btnStart.disabled = true;
+    if (btnStop) btnStop.disabled = false;
 }
 
 function stopTelemetry() {
     fetch('/api/telemetry/stop', { method: 'POST' }).then(() => {
-        document.getElementById('btn-start').disabled = false;
-        document.getElementById('btn-stop').disabled = true;
+        document.getElementById('telemetry-btn-start').disabled = false;
+        document.getElementById('telemetry-btn-stop').disabled = true;
     });
 }
 
@@ -247,42 +330,56 @@ function updateChartColors() {
     }
 }
 
-function toggleTheme() {
-    const html = document.documentElement;
-    const icon = document.getElementById('theme-icon');
-    const isDark = html.getAttribute('data-theme') === 'dark';
-    const newTheme = isDark ? 'light' : 'dark';
 
-    html.setAttribute('data-theme', newTheme);
-    html.setAttribute('data-bs-theme', newTheme);
-    icon.className = newTheme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
-    localStorage.setItem('theme', newTheme);
+let _telemetryInited = false;
 
-    updateChartColors();
+async function initTelemetryView() {
+    if (_telemetryInited) return;
+    let status;
+    let history;
+    try {
+        const [statusRes, historyRes] = await Promise.all([
+            fetch('/api/telemetry/status'),
+            fetch('/api/telemetry/history')
+        ]);
+        if (!statusRes.ok || !historyRes.ok) return;
+        status = await statusRes.json();
+        history = await historyRes.json();
+    } catch (_) {
+        return;
+    }
+
+    const btnStart = document.getElementById('telemetry-btn-start');
+    const btnStop = document.getElementById('telemetry-btn-stop');
+    if (btnStart) btnStart.disabled = status.active;
+    if (btnStop) btnStop.disabled = !status.active;
+
+    for (const snapshot of history) {
+        if (!snapshot || !snapshot.data || typeof snapshot.data !== 'object') continue;
+        [chartIn, chartOut].forEach(c => {
+            c.data.labels.push(snapshot.timestamp);
+            if (c.data.labels.length > MAX_POINTS) c.data.labels.shift();
+        });
+        for (const [device, values] of Object.entries(snapshot.data)) {
+            const idx = Object.keys(snapshot.data).indexOf(device) % COLORS.length;
+            updateDataset(chartIn, device, values.in_bps ?? 0, COLORS[idx]);
+            updateDataset(chartOut, device, values.out_bps ?? 0, COLORS[idx]);
+            if (!devicePeaks[device]) devicePeaks[device] = { in: 0, out: 0 };
+            devicePeaks[device].in = Math.max(devicePeaks[device].in, values.in_bps ?? 0);
+            devicePeaks[device].out = Math.max(devicePeaks[device].out, values.out_bps ?? 0);
+            deviceLastSeen[device] = snapshot.timestamp;
+        }
+        updateTable(snapshot.data);
+        updateStatCards(snapshot.data);
+    }
+    if (history.length) {
+        chartIn.update();
+        chartOut.update();
+    }
+
+    _telemetryInited = true;
+
+    if (!status.active) {
+        await startTelemetry().catch(() => { });
+    }
 }
-
-function openTopology() {
-    const gns3Url = document.getElementById('gns3-url').value || 'http://192.168.231.1:3080';
-    const match = gns3Url.match(/^https?:\/\/([^:\/]+)(?::(\d+))?/);
-    const host = match ? match[1] : '192.168.231.1';
-    const port = match ? (match[2] || '3080') : '3080';
-    window.open(`http://${host}:${port}/static/web-ui/server/1/project/efcd850a-ea6b-4846-855f-0513dad86b65?host=${host}&port=${port}&ssl=false`, '_blank');
-}
-
-(function applyStoredTheme() {
-    const saved = localStorage.getItem('theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', saved);
-    document.documentElement.setAttribute('data-bs-theme', saved);
-
-    window.addEventListener('DOMContentLoaded', () => {
-        const icon = document.getElementById('theme-icon');
-        if (icon) icon.className = saved === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
-        // Defer initial chart update until canvas is ready
-        setTimeout(updateChartColors, 50);
-    });
-})();
-
-fetch('/api/telemetry/status').then(r => r.json()).then(data => {
-    document.getElementById('btn-start').disabled = data.active;
-    document.getElementById('btn-stop').disabled = !data.active;
-});

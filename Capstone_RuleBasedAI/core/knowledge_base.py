@@ -93,6 +93,9 @@ class KnowledgeBase:
         else:
             self._initialize_basic_rules()
             self._save_knowledge()  # save immediately on first init
+
+        # Always ensure IDS security rules are present, even after loading from disk
+        self._ensure_ids_security_rules()
     
     def _get_next_kb_filename(self):
         existing_files = list(self.knowledge_dir.glob("knowledge_base*.json"))
@@ -527,7 +530,47 @@ class KnowledgeBase:
             topology_dependent=True
         )
         print(f"[KnowledgeBase] Initialized with {len(self.rules)} basic rules")
-    
+
+    def _ensure_ids_security_rules(self):
+        """
+        Ensures IDS-driven security rules are always present in the KB.
+        Called on every startup so they survive even after KB is loaded from disk.
+        """
+        self.add_rule(
+            rule_id='IDS_TCP_001',
+            condition={
+                'problem_type': 'ids_tcp_flood',
+                'category': 'ids_security',
+                'symptoms': ['tcp_flood_detected', 'nb_ml_anomaly']
+            },
+            action={
+                'fix_type': 'security_shutdown',
+                'commands': ['interface FastEthernet0/0', 'shutdown', 'end'],
+                'verification': 'show ip interface brief',
+                'description': 'Shut R6 FastEthernet0/0 to isolate TCP flood attack source'
+            },
+            confidence=0.97,
+            category='ids_security',
+            topology_dependent=False
+        )
+        self.add_rule(
+            rule_id='IDS_OSPF_001',
+            condition={
+                'problem_type': 'ids_ospf_attack',
+                'category': 'ids_security',
+                'symptoms': ['ospf_attack_detected', 'rf_ml_detection']
+            },
+            action={
+                'fix_type': 'security_shutdown',
+                'commands': ['interface FastEthernet0/0', 'shutdown', 'end'],
+                'verification': 'show ip interface brief',
+                'description': 'Shut R6 FastEthernet0/0 to block OSPF attack traffic'
+            },
+            confidence=0.97,
+            category='ids_security',
+            topology_dependent=False
+        )
+
     def add_rule(self, rule_id, condition, action, confidence=1.0, category="general", topology_dependent=False):
         """
         Add a troubleshooting rule to knowledge base

@@ -209,6 +209,36 @@ class FixApplier:
         verification = verify_ospf_neighbors(telnet_connection)
         return self._record_result(device_name, problem, fix_commands, verification, ok)
 
+    # ── IDS security fixes ───────────────────────────────────────────────────
+
+    def apply_ids_security_fix(self, device_name, telnet_connection, problem,
+                               auto_approve=False):
+        """Apply a security-driven shutdown or containment action sourced from an IDS alert."""
+        if self.reporter:
+            self.reporter.print_warning(
+                f"[IDS Security] {device_name} | Action: {problem.get('type')} "
+                f"on {problem.get('interface', 'interface')}"
+            )
+
+        commands = self._get_commands_for_problem(problem, device_name)
+        if not commands:
+            if self.reporter:
+                self.reporter.print_error("No IDS security commands available for this rule")
+            return None
+
+        if not (auto_approve or Confirm.ask(f"Apply IDS security fix on {device_name}?")):
+            return None
+
+        ok = apply_config_commands(telnet_connection, commands)
+        if self.reporter:
+            (self.reporter.print_success if ok else self.reporter.print_error)(
+                f"{'✔ Applied' if ok else '✘ Failed'} IDS security fix on {device_name}"
+            )
+        if ok:
+            time.sleep(1)
+        verification = send_command(telnet_connection, 'show ip interface brief', wait_time=2)
+        return self._record_result(device_name, problem, commands, verification, ok)
+
     # ── Batch apply ──────────────────────────────────────────────────────────
 
     def apply_all_fixes(self, detected_issues, device_connections,
@@ -225,6 +255,9 @@ class FixApplier:
         for device, problems in detected_issues.get('ospf', {}).items():
             for p in problems:
                 all_problems.append(('ospf', device, p))
+        for device, problems in detected_issues.get('ids_security', {}).items():
+            for p in problems:
+                all_problems.append(('ids_security', device, p))
 
         if self.inference_engine and all_problems:
             problem_dicts = [p for _, _, p in all_problems]
@@ -242,6 +275,8 @@ class FixApplier:
                 result = self.apply_eigrp_fix(device, tn, problem, auto_approve_all)
             elif category == 'ospf':
                 result = self.apply_ospf_fix(device, tn, problem, auto_approve_all)
+            elif category == 'ids_security':
+                result = self.apply_ids_security_fix(device, tn, problem, auto_approve_all)
             else:
                 result = None
             if result:
